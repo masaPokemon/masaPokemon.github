@@ -1,0 +1,8 @@
+streamlit
+streamlit-autorefresh
+extra-streamlit-components
+st-pages
+openai
+streamlit_extras
+st-supabase-connection
+python-dotenv
