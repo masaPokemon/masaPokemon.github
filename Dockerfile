@@ -6,4 +6,4 @@ RUN pip install -r requirements.txt
 
 EXPOSE 8080
 
-ENTRYPOINT ["streamlit", "run", "src/chat.py", "--server.port=8080", "--server.address=0.0.0.0"]
+ENTRYPOINT ["streamlit", "run", "chat.py", "--server.port=8080", "--server.address=0.0.0.0"]
