@@ -5,7 +5,7 @@ import streamlit as st
 from st_pages import add_page_title
 import argparse
 from src import const
-from src.moduls import common
+from src/modules import common
 from src.modules.authenticator import common_auth
 from src.modules.database import database
 
