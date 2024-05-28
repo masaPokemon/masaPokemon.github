@@ -2,7 +2,7 @@
 # BrAIns is
 AI(BrAIn)-participating multi-chat.
 
-[![Streamlit App](https://static.streamlit.io/badges/streamlit_badge_black_white.svg)](https://userchat.streamlit.app/)
+[![Streamlit App](https://static.streamlit.io/badges/streamlit_badge_black_white.svg)](https://brains.streamlit.app/)
 
 ![image](https://github.com/ppspps824/BrAIns/assets/34480286/73fb82e9-d0f7-4e61-b905-7313688fc708)
 
