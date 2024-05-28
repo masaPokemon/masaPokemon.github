@@ -2,7 +2,7 @@ import sys
 import streamlit as st
 from st_pages import Page, show_pages, add_page_title, hide_pages
 import const
-from mount/src/userchat/src import common
+from src import common
 from modules.database import database
 
 db = database.Database()
