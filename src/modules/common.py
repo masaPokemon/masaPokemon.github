@@ -1,5 +1,5 @@
 import sys
-sys.path.append("/UserChat/src/")
+sys.path.append("/src/")
 import streamlit as st
 from st_pages import Page, show_pages, add_page_title, hide_pages
 import const
