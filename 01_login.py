@@ -1,10 +1,11 @@
 # This page is used to login to the application
 import sys
+sys.path.append("/mount/src/userchat/src")
 import streamlit as st
 from st_pages import add_page_title
 import argparse
 from src import const
-from sys.path.append("/mount/src/userchat/src") import common
+from  src import common
 from src.modules.authenticator import common_auth
 from src.modules.database import database
 
