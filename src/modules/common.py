@@ -3,7 +3,7 @@ sys.path.append("/UserChat/src/")
 import streamlit as st
 from st_pages import Page, show_pages, add_page_title, hide_pages
 from src import const
-from modules import common
+from src import common
 from modules.database import database
 
 db = database.Database()
