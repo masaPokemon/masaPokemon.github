@@ -1,8 +1,8 @@
 import sys
-sys.path.append("/UserChat/src/")
+sys.path.append("mount/src/userchat/src")
 import streamlit as st
 from st_pages import Page, show_pages, add_page_title, hide_pages
-from src import const
+import const
 from src import common
 from modules.database import database
 
