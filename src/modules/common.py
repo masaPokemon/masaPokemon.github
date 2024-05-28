@@ -4,7 +4,7 @@ sys.path.append("mount/src/userchat/src/modules/common.py")
 import streamlit as st
 from st_pages import Page, show_pages, add_page_title, hide_pages
 import const
-import common
+from mount/src/userchat/src import common
 from modules.database import database
 
 db = database.Database()
