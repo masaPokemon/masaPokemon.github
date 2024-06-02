@@ -1,9 +1,5 @@
 # This page is used to login to the application
 import sys
-sys.path.append("/mount/src/userchat/src/")
-sys.path.append("/mount/src/userchat/src/modules")
-sys.path.append("/mount/src/userchat/src/modules/database")
-sys.path.append("/mount/src/userchat/src/modules/authenticator")
 import streamlit as st
 from st_pages import add_page_title
 import argparse
