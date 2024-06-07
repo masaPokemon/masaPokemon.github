@@ -1,57 +1,30 @@
-# This page is used to login to the application
-import sys
 import streamlit as st
-from st_pages import add_page_title
-import argparse
-import const
-import common
-import common_auth
-import database
+from yaoya.pages.base import BasePage
+from yaoya.services.auth import AuthenticationError, IAuthAPIClientService
+from yaoya.services.user import IUserAPIClientService
 
-# Setting page title
-common.set_pages()
-add_page_title()
 
-# Get the command line arguments
-parser = argparse.ArgumentParser(
-    description="This page is used to login to the application",
-)
-parser.add_argument(
-    "--use_chatbot",
-    help="Use chatbot",
-    action="store_true",
-)
-args = parser.parse_args()
-use_chatbot = args.use_chatbot
+class LoginPage(BasePage):
+    def render(self) -> None:
+        auth_api_client: IAuthAPIClientService = self.ssm.get_auth_api_client()
+        user_api_client: IUserAPIClientService = self.ssm.get_user_api_client()
 
-# Update the use_chatbot setting
-db = database.Database()
-current_use_chatbot = db.get_openai_settings_use_character()
-if int(use_chatbot) != current_use_chatbot:
-    db.update_openai_settings_use_character(use_chatbot)
+        # ページ描画
+        st.title(self.title)
+        with st.form("form"):
+            user_id = st.text_input("UserID")
+            password = st.text_input("Password", type="password")
+            submit_button = st.form_submit_button(label="ログイン")
 
-authenticator = common_auth.get_authenticator()
-name, authentication_status, username = authenticator.login("Login", "main")
+        if submit_button:
+            try:
+                session_id = auth_api_client.login(user_id, password)
+                user = user_api_client.get_by_session_id(session_id)
+            except AuthenticationError:
+                st.sidebar.error("ユーザID または パスワードが間違っています。")
+                return
 
-if (
-    common.check_if_exists_in_session(const.SESSION_INFO_AUTH_STATUS)
-    and st.session_state[const.SESSION_INFO_AUTH_STATUS]
-):
-    if common.check_if_exists_in_session(const.SESSION_INFO_NAME):
-        # Sucessfully logged in
-        authenticator.logout("Logout", "main", key="unique_key")
-        st.write(f"Welcome *{st.session_state[const.SESSION_INFO_NAME]}*")
-        st.write("Go to the chat page and start chatting!")
-        common.set_pages()
-    else:
-        st.error("User name is not set in session state.")
-elif common.check_if_exists_in_session(const.SESSION_INFO_AUTH_STATUS):
-    # Not logged in
-    if st.session_state["authentication_status"] is False:
-        st.error("Username/password is incorrect")
-    elif st.session_state["authentication_status"] is None:
-        st.warning("Please enter your username and password")
-    else:
-        st.error(const.ERR_MSG_UNEXPECTED)
-else:
-    st.error(const.ERR_MSG_UNEXPECTED)
+            # ログインに成功した場合、成功メッセージを表示する
+            st.sidebar.success("ログインに成功しました。")
+            self.ssm.set_user(user)
+            self.ssm.set_session_id(session_id)
