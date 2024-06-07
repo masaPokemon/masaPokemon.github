@@ -1,20 +1,15 @@
 import streamlit as st
 
-# セッションステートを初期化
-if "messages" not in st.session_state:
-    st.session_state.messages = []
+from yaoya.init_app import init_app, init_pages, init_session
 
-# タイトルを設定
-st.title("グループチャット")
+if not st.session_state.get("is_started", False):
+    ssm = init_session()
+    pages = init_pages(ssm)
+    app = init_app(ssm, pages)
+    st.session_state["is_started"] = True
+    st.session_state["app"] = app
+    st.set_page_config(page_title="八百屋さんEC", layout="wide")
 
-# メッセージ入力欄
-message = st.text_area("メッセージを入力してください")
-
-# 送信ボタン
-if st.button("送信"):
-    st.session_state.messages.append(message)
-    st.text_area("", value="", key="output")
-
-# 過去のメッセージを表示
-for msg in st.session_state.messages:
-    st.text(msg)
+app = st.session_state.get("app", None)
+if app is not None:
+    app.render()
