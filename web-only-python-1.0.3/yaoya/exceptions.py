@@ -1,2 +1,0 @@
-class YaoyaError(Exception):
-    pass
