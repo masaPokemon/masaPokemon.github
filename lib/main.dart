@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
-import 'game.dart';
-import 'models/player.dart';
+import 'package:provider/provider.dart';
+import 'game_provider.dart';
+import 'player_model.dart';
 
 void main() {
   runApp(MyApp());
@@ -9,74 +10,56 @@ void main() {
 class MyApp extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
-    return MaterialApp(
-      title: 'PvP Werewolf Game',
-      theme: ThemeData(
-        primarySwatch: Colors.blue,
+    return ChangeNotifierProvider(
+      create: (context) => GameProvider(),
+      child: MaterialApp(
+        home: GameScreen(),
       ),
-      home: GameScreen(),
     );
   }
 }
 
-class GameScreen extends StatefulWidget {
-  @override
-  _GameScreenState createState() => _GameScreenState();
-}
-
-class _GameScreenState extends State<GameScreen> {
-  final Game game = Game();
-  final TextEditingController _controller = TextEditingController();
-
-  void _addPlayer() {
-    if (_controller.text.isNotEmpty) {
-      setState(() {
-        game.addPlayer(_controller.text);
-        _controller.clear();
-      });
-    }
-  }
-
-  void _vote(Player player) {
-    setState(() {
-      game.vote(player);
-    });
-  }
-
+class GameScreen extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      appBar: AppBar(
-        title: Text('PvP Werewolf Game'),
-      ),
-      body: Column(
-        children: [
-          TextField(
-            controller: _controller,
-            decoration: InputDecoration(
-              labelText: 'Enter player name',
-              suffixIcon: IconButton(
-                icon: Icon(Icons.add),
-                onPressed: _addPlayer,
+      appBar: AppBar(title: Text('Werewolf Game')),
+      body: Consumer<GameProvider>(
+        builder: (context, gameProvider, child) {
+          return Column(
+            children: [
+              Text(gameProvider.isNight ? "Night Time" : "Day Time", style: TextStyle(fontSize: 24)),
+              Expanded(
+                child: ListView.builder(
+                  itemCount: gameProvider.players.length,
+                  itemBuilder: (context, index) {
+                    Player player = gameProvider.players[index];
+                    return ListTile(
+                      title: Text(player.name),
+                      subtitle: Text(player.isAlive ? "Alive" : "Dead"),
+                      trailing: player.isAlive && gameProvider.isNight
+                          ? ElevatedButton(
+                              onPressed: () {
+                                gameProvider.werewolfAttack(player.name);
+                              },
+                              child: Text("Attack"),
+                            )
+                          : null,
+                    );
+                  },
+                ),
               ),
-            ),
-          ),
-          Expanded(
-            child: ListView.builder(
-              itemCount: game.players.length,
-              itemBuilder: (context, index) {
-                Player player = game.players[index];
-                return ListTile(
-                  title: Text('${player.name} (${player.role})'),
-                  subtitle: Text(player.isAlive ? 'Alive' : 'Dead'),
-                  onTap: player.isAlive ? () => _vote(player) : null,
-                );
-              },
-            ),
-          ),
-          if (game.isGameOver())
-            Text('Game Over!'),
-        ],
+              ElevatedButton(
+                onPressed: () {
+                  gameProvider.toggleDayNight();
+                },
+                child: Text(gameProvider.isNight ? "Switch to Day" : "Switch to Night"),
+              ),
+              if (gameProvider.gameOver)
+                Text("Game Over", style: TextStyle(fontSize: 32, color: Colors.red)),
+            ],
+          );
+        },
       ),
     );
   }
