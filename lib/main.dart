@@ -1,41 +1,82 @@
-import 'dart:io';                            // Add this import.
 import 'package:flutter/material.dart';
-import 'package:webview_flutter/webview_flutter.dart';
+import 'game.dart';
+import 'models/player.dart';
 
 void main() {
-  runApp(
-    const MaterialApp(
-      home: WebViewApp(),
-    ),
-  );
+  runApp(MyApp());
 }
 
-class WebViewApp extends StatefulWidget {
-  const WebViewApp({Key? key}) : super(key: key);
-
+class MyApp extends StatelessWidget {
   @override
-  State<WebViewApp> createState() => _WebViewAppState();
-}
-
-class _WebViewAppState extends State<WebViewApp> {
-  // Add from here ...
-  @override
-  void initState() {
-    if (Platform.isAndroid) {
-      WebView.platform = SurfaceAndroidWebView();
-    }
-    super.initState();
+  Widget build(BuildContext context) {
+    return MaterialApp(
+      title: 'PvP Werewolf Game',
+      theme: ThemeData(
+        primarySwatch: Colors.blue,
+      ),
+      home: GameScreen(),
+    );
   }
-  // ... to here.
+}
+
+class GameScreen extends StatefulWidget {
+  @override
+  _GameScreenState createState() => _GameScreenState();
+}
+
+class _GameScreenState extends State<GameScreen> {
+  final Game game = Game();
+  final TextEditingController _controller = TextEditingController();
+
+  void _addPlayer() {
+    if (_controller.text.isNotEmpty) {
+      setState(() {
+        game.addPlayer(_controller.text);
+        _controller.clear();
+      });
+    }
+  }
+
+  void _vote(Player player) {
+    setState(() {
+      game.vote(player);
+    });
+  }
 
   @override
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(
-        title: const Text('Flutter WebView'),
+        title: Text('PvP Werewolf Game'),
       ),
-      body: const WebView(
-        initialUrl: 'https://m.youtube.com/?hl=ja',
+      body: Column(
+        children: [
+          TextField(
+            controller: _controller,
+            decoration: InputDecoration(
+              labelText: 'Enter player name',
+              suffixIcon: IconButton(
+                icon: Icon(Icons.add),
+                onPressed: _addPlayer,
+              ),
+            ),
+          ),
+          Expanded(
+            child: ListView.builder(
+              itemCount: game.players.length,
+              itemBuilder: (context, index) {
+                Player player = game.players[index];
+                return ListTile(
+                  title: Text('${player.name} (${player.role})'),
+                  subtitle: Text(player.isAlive ? 'Alive' : 'Dead'),
+                  onTap: player.isAlive ? () => _vote(player) : null,
+                );
+              },
+            ),
+          ),
+          if (game.isGameOver())
+            Text('Game Over!'),
+        ],
       ),
     );
   }
