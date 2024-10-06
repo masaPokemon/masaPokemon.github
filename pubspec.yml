@@ -1,4 +1,4 @@
-name: 
+name: screen_captcha
 description: Chat Sample
 
 version: 0.10.0
@@ -10,7 +10,7 @@ dependencies:
   flutter:
     sdk: flutter
 
-  provider: ^6.0.0
+  screenshot: ^1.3.1
   
 
 dev_dependencies:
