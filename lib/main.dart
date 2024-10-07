@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
-import 'package:provider/provider.dart';
+import 'package:socket_io_client/socket_io_client.dart' as IO;
+import 'package:flutter_screen_recording/flutter_screen_recording.dart';
 
 void main() {
   runApp(MyApp());
@@ -8,77 +9,68 @@ void main() {
 class MyApp extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
-    return ChangeNotifierProvider(
-      create: (_) => StudentProvider(),
-      child: MaterialApp(
-        title: 'Classroom Screen Share',
-        home: ClassroomScreen(),
-      ),
+    return MaterialApp(
+      title: 'Classroom App',
+      theme: ThemeData(primarySwatch: Colors.blue),
+      home: ScreenSharePage(),
     );
   }
 }
 
-class StudentProvider extends ChangeNotifier {
-  List<Student> _students = [
-    Student(name: 'Student 1'),
-    Student(name: 'Student 2'),
-    Student(name: 'Student 3'),
-  ];
-
-  List<Student> get students => _students;
-}
-
-class Student {
-  final String name;
-
-  Student({required this.name});
-}
-
-class ClassroomScreen extends StatelessWidget {
+class ScreenSharePage extends StatefulWidget {
   @override
-  Widget build(BuildContext context) {
-    final studentProvider = Provider.of<StudentProvider>(context);
-    return Scaffold(
-      appBar: AppBar(
-        title: Text('Classroom'),
-      ),
-      body: ListView.builder(
-        itemCount: studentProvider.students.length,
-        itemBuilder: (context, index) {
-          final student = studentProvider.students[index];
-          return ListTile(
-            title: Text(student.name),
-            trailing: IconButton(
-              icon: Icon(Icons.screen_share),
-              onPressed: () {
-                Navigator.push(
-                  context,
-                  MaterialPageRoute(
-                    builder: (context) => ScreenShareScreen(student: student),
-                  ),
-                );
-              },
-            ),
-          );
-        },
-      ),
-    );
+  _ScreenSharePageState createState() => _ScreenSharePageState();
+}
+
+class _ScreenSharePageState extends State<ScreenSharePage> {
+  late IO.Socket socket;
+  bool isRecording = false;
+
+  @override
+  void initState() {
+    super.initState();
+    socket = IO.io('http://localhost:3000', <String, dynamic>{
+      'transports': ['websocket'],
+      'autoConnect': true,
+    });
+
+    socket.on('screen-shared', (data) {
+      // Handle screen shared data (display it)
+    });
   }
-}
 
-class ScreenShareScreen extends StatelessWidget {
-  final Student student;
+  void startScreenShare() async {
+    await FlutterScreenRecording.startRecordScreen('classroom');
+    setState(() {
+      isRecording = true;
+    });
+  }
 
-  ScreenShareScreen({required this.student});
+  void stopScreenShare() async {
+    String? path = await FlutterScreenRecording.stopRecordScreen;
+    if (path != null) {
+      // Send the recorded video to the server
+      socket.emit('screen-share', path);
+    }
+    setState(() {
+      isRecording = false;
+    });
+  }
 
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      appBar: AppBar(
-        title: Text('${student.name} Screen Share'),
-      ),
+      appBar: AppBar(title: Text('Classroom Screen Share')),
       body: Center(
-        child: Text('${student.name}の画面が共有されています。'),
+        child: isRecording
+            ? ElevatedButton(
+                onPressed: stopScreenShare,
+                child: Text('Stop Sharing'),
+              )
+            : ElevatedButton(
+                onPressed: startScreenShare,
+                child: Text('Start Sharing'),
+              ),
       ),
     );
   }
