@@ -1,78 +1,75 @@
 import 'package:flutter/material.dart';
-import 'package:image_gallery_saver/image_gallery_saver.dart';
+import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:screenshot/screenshot.dart';
+import 'dart:async';
 
-void main() {
-  runApp(const MyApp());
+void main() async {
+  WidgetsFlutterBinding.ensureInitialized();
+  await Firebase.initializeApp();
+  runApp(MyApp());
 }
 
 class MyApp extends StatelessWidget {
-  const MyApp({Key? key}) : super(key: key);
-
   @override
   Widget build(BuildContext context) {
     return MaterialApp(
-      title: 'Flutter Demo',
-      theme: ThemeData(
-        primarySwatch: Colors.blue,
-      ),
-      home: const MyHomePage(title: 'Flutter Demo Home Page'),
+      title: 'Screenshot to Firestore',
+      home: ScreenshotHome(),
     );
   }
 }
 
-class MyHomePage extends StatefulWidget {
-  const MyHomePage({Key? key, required this.title}) : super(key: key);
-
-  final String title;
-
+class ScreenshotHome extends StatefulWidget {
   @override
-  State<MyHomePage> createState() => _MyHomePageState();
+  _ScreenshotHomeState createState() => _ScreenshotHomeState();
 }
 
-class _MyHomePageState extends State<MyHomePage> {
-  ScreenshotController screenshotController = ScreenshotController();
+class _ScreenshotHomeState extends State<ScreenshotHome> {
+  final ScreenshotController _screenshotController = ScreenshotController();
+  late Timer _timer;
 
-  Future<void> storeImage() async {
-    screenshotController.capture().then((capturedImage) async {
-      if (capturedImage != null) {
-        await ImageGallerySaver.saveImage(capturedImage);
-      }
+  @override
+  void initState() {
+    super.initState();
+    _startScreenshotTimer();
+  }
+
+  void _startScreenshotTimer() {
+    _timer = Timer.periodic(Duration(seconds: 1), (timer) {
+      _takeScreenshot();
     });
+  }
+
+  Future<void> _takeScreenshot() async {
+    final image = await _screenshotController.capture();
+
+    if (image != null) {
+      // Firestoreに送信
+      await FirebaseFirestore.instance.collection('screenshots').add({
+        'timestamp': FieldValue.serverTimestamp(),
+        'image': image, // ここでは画像のバイナリデータを保存する例を示しています
+      });
+    }
+  }
+
+  @override
+  void dispose() {
+    _timer.cancel();
+    super.dispose();
   }
 
   @override
   Widget build(BuildContext context) {
-    return Scaffold(
-      appBar: AppBar(
-        title: Text(widget.title),
-      ),
-      body: Center(
-        child: Column(
-          mainAxisAlignment: MainAxisAlignment.center,
-          children: <Widget>[
-            Screenshot(
-              controller: screenshotController,
-              child: Container(
-                width: 200,
-                height: 200,
-                color: Colors.greenAccent,
-                child: const Center(
-                  child: Text(
-                    'ここのWidgetを保存するよ',
-                  ),
-                ),
-              ),
-            ),
-          ],
+    return Screenshot(
+      controller: _screenshotController,
+      child: Scaffold(
+        appBar: AppBar(
+          title: Text('Screenshot Example'),
         ),
-      ),
-      floatingActionButton: FloatingActionButton(
-        onPressed: storeImage,
-        tooltip: 'Increment',
-        child: const Icon(Icons.add),
+        body: Center(
+          child: Text('スクリーンショットを撮影中...'),
+        ),
       ),
     );
   }
 }
-
