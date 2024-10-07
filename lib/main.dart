@@ -1,6 +1,5 @@
 import 'package:flutter/material.dart';
-import 'package:socket_io_client/socket_io_client.dart' as IO;
-import 'package:flutter_screen_recording/flutter_screen_recording.dart';
+import 'package:flutter_webview_plugin/flutter_webview_plugin.dart';
 
 void main() {
   runApp(MyApp());
@@ -10,67 +9,63 @@ class MyApp extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return MaterialApp(
-      title: 'Classroom App',
-      theme: ThemeData(primarySwatch: Colors.blue),
-      home: ScreenSharePage(),
+      title: 'YouTube Viewer',
+      theme: ThemeData(
+        primarySwatch: Colors.blue,
+      ),
+      home: YouTubeViewer(),
     );
   }
 }
 
-class ScreenSharePage extends StatefulWidget {
+class YouTubeViewer extends StatefulWidget {
   @override
-  _ScreenSharePageState createState() => _ScreenSharePageState();
+  _YouTubeViewerState createState() => _YouTubeViewerState();
 }
 
-class _ScreenSharePageState extends State<ScreenSharePage> {
-  late IO.Socket socket;
-  bool isRecording = false;
+class _YouTubeViewerState extends State<YouTubeViewer> {
+  final TextEditingController _controller = TextEditingController();
+  String _url = '';
 
-  @override
-  void initState() {
-    super.initState();
-    socket = IO.io('http://localhost:3000', <String, dynamic>{
-      'transports': ['websocket'],
-      'autoConnect': true,
-    });
-
-    socket.on('screen-shared', (data) {
-      // Handle screen shared data (display it)
-    });
-  }
-
-  void startScreenShare() async {
-    await FlutterScreenRecording.startRecordScreen('classroom');
+  void _loadVideo() {
     setState(() {
-      isRecording = true;
-    });
-  }
-
-  void stopScreenShare() async {
-    String? path = await FlutterScreenRecording.stopRecordScreen;
-    if (path != null) {
-      // Send the recorded video to the server
-      socket.emit('screen-share', path);
-    }
-    setState(() {
-      isRecording = false;
+      _url = _controller.text;
     });
   }
 
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      appBar: AppBar(title: Text('Classroom Screen Share')),
-      body: Center(
-        child: isRecording
-            ? ElevatedButton(
-                onPressed: stopScreenShare,
-                child: Text('Stop Sharing'),
-              )
-            : ElevatedButton(
-                onPressed: startScreenShare,
-                child: Text('Start Sharing'),
+      appBar: AppBar(
+        title: Text('YouTube Viewer'),
+      ),
+      body: Column(
+        children: [
+          Padding(
+            padding: const EdgeInsets.all(16.0),
+            child: TextField(
+              controller: _controller,
+              decoration: InputDecoration(
+                border: OutlineInputBorder(),
+                labelText: 'YouTube URL',
               ),
+            ),
+          ),
+          ElevatedButton(
+            onPressed: _loadVideo,
+            child: Text('Load Video'),
+          ),
+          Expanded(
+            child: _url.isNotEmpty
+                ? WebviewScaffold(
+                    url: _url,
+                    withJavascript: true,
+                    withZoom: true,
+                    hidden: true,
+                  )
+                : Center(child: Text('Enter a YouTube URL to watch a video')),
+          ),
+        ],
       ),
     );
   }
