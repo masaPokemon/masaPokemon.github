@@ -1,6 +1,5 @@
 import 'package:flutter/material.dart';
-import 'package:permission_handler/permission_handler.dart';
-import 'package:screen_capture/screen_capture.dart';
+import 'package:provider/provider.dart';
 
 void main() {
   runApp(MyApp());
@@ -9,64 +8,77 @@ void main() {
 class MyApp extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
-    return MaterialApp(
-      title: 'Classroom Monitoring',
-      theme: ThemeData(
-        primarySwatch: Colors.blue,
+    return ChangeNotifierProvider(
+      create: (_) => StudentProvider(),
+      child: MaterialApp(
+        title: 'Classroom Screen Share',
+        home: ClassroomScreen(),
       ),
-      home: ClassroomScreen(),
     );
   }
 }
 
-class ClassroomScreen extends StatefulWidget {
-  @override
-  _ClassroomScreenState createState() => _ClassroomScreenState();
+class StudentProvider extends ChangeNotifier {
+  List<Student> _students = [
+    Student(name: 'Student 1'),
+    Student(name: 'Student 2'),
+    Student(name: 'Student 3'),
+  ];
+
+  List<Student> get students => _students;
 }
 
-class _ClassroomScreenState extends State<ClassroomScreen> {
-  bool isRecording = false;
+class Student {
+  final String name;
 
-  Future<void> _startScreenCapture() async {
-    // 権限のリクエスト
-    if (await Permission.mediaLibrary.request().isGranted) {
-      setState(() {
-        isRecording = true;
-      });
-      ScreenCapture.start();
-    } else {
-      // 権限が拒否された場合の処理
-      print('Screen capture permission denied');
-    }
-  }
+  Student({required this.name});
+}
 
-  Future<void> _stopScreenCapture() async {
-    ScreenCapture.stop();
-    setState(() {
-      isRecording = false;
-    });
+class ClassroomScreen extends StatelessWidget {
+  @override
+  Widget build(BuildContext context) {
+    final studentProvider = Provider.of<StudentProvider>(context);
+    return Scaffold(
+      appBar: AppBar(
+        title: Text('Classroom'),
+      ),
+      body: ListView.builder(
+        itemCount: studentProvider.students.length,
+        itemBuilder: (context, index) {
+          final student = studentProvider.students[index];
+          return ListTile(
+            title: Text(student.name),
+            trailing: IconButton(
+              icon: Icon(Icons.screen_share),
+              onPressed: () {
+                Navigator.push(
+                  context,
+                  MaterialPageRoute(
+                    builder: (context) => ScreenShareScreen(student: student),
+                  ),
+                );
+              },
+            ),
+          );
+        },
+      ),
+    );
   }
+}
+
+class ScreenShareScreen extends StatelessWidget {
+  final Student student;
+
+  ScreenShareScreen({required this.student});
 
   @override
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(
-        title: Text('Classroom Monitoring'),
+        title: Text('${student.name} Screen Share'),
       ),
       body: Center(
-        child: Column(
-          mainAxisAlignment: MainAxisAlignment.center,
-          children: <Widget>[
-            Text(
-              '生徒の画面を共有しています',
-            ),
-            SizedBox(height: 20),
-            ElevatedButton(
-              onPressed: isRecording ? _stopScreenCapture : _startScreenCapture,
-              child: Text(isRecording ? '停止' : '開始'),
-            ),
-          ],
-        ),
+        child: Text('${student.name}の画面が共有されています。'),
       ),
     );
   }
