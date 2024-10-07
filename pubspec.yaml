@@ -9,7 +9,7 @@ dependencies:
   flutter:
     sdk: flutter
   # 適宜、適切なVersionを入れてください。
-  image_gallery_saver: ^1.7.1
+  cloud_firestore: ^4.8.0
   screenshot: ^1.2.3
   
 dev_dependencies:
