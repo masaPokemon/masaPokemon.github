@@ -9,8 +9,8 @@ dependencies:
   flutter:
     sdk: flutter
   
-  permission_handler: ^10.2.0
-  flutter_webrtc: ^0.8.0
+  screen_capture: ^latest_version  # 画面キャプチャ用パッケージ
+  permission_handler: ^latest_version
   
 dev_dependencies:
   riverpod_generator: ^2.3.11
