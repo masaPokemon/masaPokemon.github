@@ -8,7 +8,9 @@ environment:
 dependencies:
   flutter:
     sdk: flutter
-  flutter_webrtc: ^0.9.23
+  # 適宜、適切なVersionを入れてください。
+  image_gallery_saver: ^1.7.1
+  screenshot: ^1.2.3
   
 dev_dependencies:
   riverpod_generator: ^2.3.11
