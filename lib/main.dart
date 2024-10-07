@@ -1,5 +1,4 @@
 import 'package:flutter/material.dart';
-import 'package:flutter_webview_plugin/flutter_webview_plugin.dart';
 
 void main() {
   runApp(MyApp());
@@ -24,13 +23,24 @@ class YouTubeViewer extends StatefulWidget {
 }
 
 class _YouTubeViewerState extends State<YouTubeViewer> {
-  final TextEditingController _controller = TextEditingController();
-  String _url = '';
+  final TextEditingController _urlController = TextEditingController();
+  String? _videoId;
 
-  void _loadVideo() {
-    setState(() {
-      _url = _controller.text;
-    });
+  void _extractVideoId() {
+    final url = _urlController.text;
+    // YouTubeのURLから動画IDを抽出
+    final RegExp regex = RegExp(r'(?:youtu\.be/|(?:www\.)?youtube\.com/(?:[^/]+/.*|(?:v|e(?:mbed)?|watch(?:\?.*)?)/|.*[?&]v=))([^&]{11})');
+    final match = regex.firstMatch(url);
+    if (match != null && match.groupCount > 0) {
+      setState(() {
+        _videoId = match.group(1);
+      });
+    } else {
+      // 入力されたURLが無効な場合はエラーメッセージを表示
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('無効なYouTube URLです。')),
+      );
+    }
   }
 
   @override
@@ -44,29 +54,46 @@ class _YouTubeViewerState extends State<YouTubeViewer> {
           Padding(
             padding: const EdgeInsets.all(16.0),
             child: TextField(
-              controller: _controller,
+              controller: _urlController,
               decoration: InputDecoration(
+                labelText: 'YouTube URLを入力',
                 border: OutlineInputBorder(),
-                labelText: 'YouTube URL',
               ),
             ),
           ),
           ElevatedButton(
-            onPressed: _loadVideo,
-            child: Text('Load Video'),
+            onPressed: _extractVideoId,
+            child: Text('動画を表示'),
           ),
-          Expanded(
-            child: _url.isNotEmpty
-                ? WebviewScaffold(
-                    url: _url,
-                    withJavascript: true,
-                    withZoom: true,
-                    hidden: true,
-                  )
-                : Center(child: Text('Enter a YouTube URL to watch a video')),
-          ),
+          if (_videoId != null)
+            Expanded(
+              child: Container(
+                padding: const EdgeInsets.all(16.0),
+                child: HtmlElementView(
+                  viewType: 'iframeElement',
+                ),
+              ),
+            ),
         ],
       ),
     );
+  }
+}
+
+// HTMLにiframeを追加するための設定
+class IframeElement extends HtmlElementView {
+  IframeElement() : super(viewType: 'iframeElement');
+
+  @override
+  Widget build(BuildContext context) {
+    // YouTube動画を埋め込むためのURL
+    final url = 'https://www.youtube.com/embed/$_videoId?autoplay=1';
+    final html = '''
+      <iframe width="100%" height="100%" src="$url" frameborder="0" allowfullscreen></iframe>
+    ''';
+    final iframeElement = IFrameElement()
+      ..src = url
+      ..style.border = 'none';
+    return HtmlElementView(viewType: 'iframeElement');
   }
 }
