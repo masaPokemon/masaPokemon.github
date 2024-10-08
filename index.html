@@ -32,6 +32,15 @@
   <title>video</title>
   <link rel="manifest" href="manifest.json">
 </head>
+<script>
+  // iframeのためのビューポートを設定
+  window.onload = function() {
+    const iframeElement = document.createElement('iframe');
+    iframeElement.style.width = '100%';
+    iframeElement.style.height = '100%';
+    document.body.appendChild(iframeElement);
+  };
+</script>
 <body>
   <script src="flutter_bootstrap.js" async></script>
   <script src="https://unpkg.com/@zxing/library@0.19.1" type="application/javascript"></script>
