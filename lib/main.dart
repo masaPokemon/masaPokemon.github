@@ -1,92 +1,83 @@
+import 'package:cross_file/cross_file.dart';
 import 'package:flutter/material.dart';
-import 'database_helper.dart';
+import 'package:flutter_screen_recording/flutter_screen_recording.dart';
+import 'package:firebase_core/firebase_core.dart';
+import 'package:firebase_storage/firebase_storage.dart';
+import 'dart:async';
 
-void main() {
-  runApp(KidsSearchHistoryApp());
+import 'firebase_options.dart';
+
+void main() async {
+  WidgetsFlutterBinding.ensureInitialized();
+  await Firebase.initializeApp(
+    options: DefaultFirebaseOptions.currentPlatform,
+  );
+  runApp(MyApp());
 }
 
-class KidsSearchHistoryApp extends StatelessWidget {
+class MyApp extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return MaterialApp(
-      title: 'Kids Search History',
-      theme: ThemeData(primarySwatch: Colors.blue),
-      home: SearchHistoryPage(),
+      title: 'Screen Sharing App',
+      home: ScreenShare(),
     );
   }
 }
 
-class SearchHistoryPage extends StatefulWidget {
+class ScreenShare extends StatefulWidget {
   @override
-  _SearchHistoryPageState createState() => _SearchHistoryPageState();
+  _ScreenShareState createState() => _ScreenShareState();
 }
 
-class _SearchHistoryPageState extends State<SearchHistoryPage> {
-  final DatabaseHelper _databaseHelper = DatabaseHelper();
-  final TextEditingController _searchController = TextEditingController();
-  List<Map<String, dynamic>> _history = [];
+class _ScreenShareState extends State<ScreenShare> {
+  String? filePath;
 
-  @override
-  void initState() {
-    super.initState();
-    _loadHistory();
+  Future<void> _startRecording() async {
+    await FlutterScreenRecording.startRecordScreen('Recording');
   }
 
-  Future<void> _loadHistory() async {
-    List<Map<String, dynamic>> history = await _databaseHelper.getHistory();
-    setState(() {
-      _history = history;
-    });
-  }
+  Future<void> _stopRecording() async {
+    final filePath = await FlutterScreenRecording.stopRecordScreen;
 
-  Future<void> _addSearchHistory() async {
-    String query = _searchController.text.trim();
-    if (query.isNotEmpty) {
-      await _databaseHelper.insertHistory(query);
-      _searchController.clear();
-      _loadHistory();
+    if (filePath != null) {
+      await _uploadToFirebase(filePath);
     }
   }
 
-  Future<void> _deleteHistory(int id) async {
-    await _databaseHelper.deleteHistory(id);
-    _loadHistory();
+  Future<void> _uploadToFirebase(String filePath) async {
+    XFile file = XFile(filePath);
+    FirebaseStorage storage = FirebaseStorage.instance;
+    try {
+      Reference referenceRoot = FirebaseStorage.instance.ref("images/${DateTime.now()}.webm").child(file.name); //cloud storageの/imagesフォルダにアップロード
+
+      UploadTask uploadTask = referenceRoot.putData(await file.readAsBytes());
+
+      print('アップロード完了');
+      var downloadUrl = await referenceRoot.getDownloadURL(); //url取得
+      print('downloadUrl:$downloadUrl');
+      //await storage.ref('screenshots/${DateTime.now()}.png').putFile(file);
+      print('Upload complete');
+    } catch (e) {
+      print('Upload failed: $e');
+    }
   }
 
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      appBar: AppBar(title: Text('Kids Search History')),
-      body: Padding(
-        padding: const EdgeInsets.all(16.0),
+      appBar: AppBar(title: Text('Screen Sharing')),
+      body: Center(
         child: Column(
-          children: [
-            TextField(
-              controller: _searchController,
-              decoration: InputDecoration(
-                labelText: 'Search Query',
-                suffixIcon: IconButton(
-                  icon: Icon(Icons.add),
-                  onPressed: _addSearchHistory,
-                ),
-              ),
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: <Widget>[
+            ElevatedButton(
+              onPressed: _startRecording,
+              child: Text('Start Recording'),
             ),
-            SizedBox(height: 16),
-            Expanded(
-              child: ListView.builder(
-                itemCount: _history.length,
-                itemBuilder: (context, index) {
-                  final item = _history[index];
-                  return ListTile(
-                    title: Text(item['query']),
-                    subtitle: Text(item['date']),
-                    trailing: IconButton(
-                      icon: Icon(Icons.delete),
-                      onPressed: () => _deleteHistory(item['id']),
-                    ),
-                  );
-                },
-              ),
+            ElevatedButton(
+              onPressed: _stopRecording,
+              child: Text('Stop Recording'),
             ),
           ],
         ),
