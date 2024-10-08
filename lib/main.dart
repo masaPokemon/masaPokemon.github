@@ -1,6 +1,15 @@
 import 'package:flutter/material.dart';
 import 'package:firebase_storage/firebase_storage.dart';
 import 'package:screenshot/screenshot.dart';
+import 'package:firebase_core/firebase_core.dart';
+import 'firebase_options.dart';
+
+void main() {
+  await Firebase.initializeApp(
+    options: DefaultFirebaseOptions.currentPlatform,
+  );
+  runApp(ScreenCapture());
+}  
 
 class ScreenCapture extends StatefulWidget {
   @override
@@ -19,7 +28,7 @@ class _ScreenCaptureState extends State<ScreenCapture> {
     });
   }
 
-  void uploadToServer(image) {
+  void uploadToServer(image) async {
     final imageFile = File(image.path);
     FirebaseStorage storage = FirebaseStorage.instance;
     try {
