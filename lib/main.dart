@@ -30,10 +30,9 @@ class _ScreenCaptureState extends State<ScreenCapture> {
   }
 
   void uploadToServer(image) async {
-    final imageFile = File(image.path);
     FirebaseStorage storage = FirebaseStorage.instance;
     try {
-      await storage.ref('sample.png').putFile(imageFile);
+      await storage.ref('sample.png').putFile(image);
     } catch (e) {
       print(e);
     }
@@ -50,7 +49,7 @@ class _ScreenCaptureState extends State<ScreenCapture> {
           child: Center(
             child: ElevatedButton(
               onPressed: () async {
-                captureScreen()
+                captureScreen();
               }
               child: Text('Capture and Stream'),
             ),
