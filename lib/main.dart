@@ -35,9 +35,6 @@ class _ScreenShareState extends State<ScreenShare> {
 
   Future<void> _startRecording() async {
     await FlutterScreenRecording.startRecordScreen('Recording');
-    Future.delayed(Duration(seconds: 1), () {
-      _stopRecording();
-    });
   }
 
   Future<void> _stopRecording() async {
