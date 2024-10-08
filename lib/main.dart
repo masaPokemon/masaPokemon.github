@@ -18,7 +18,7 @@ class _ScreenCaptureState extends State<ScreenCapture> {
     });
   }
 
-  void uploadToServer(Uint8List image) {
+  void uploadToServer(image) {
     // Function to send image data to a streaming server or Firebase
   }
 
@@ -32,7 +32,7 @@ class _ScreenCaptureState extends State<ScreenCapture> {
           color: Colors.white,
           child: Center(
             child: ElevatedButton(
-              onPressed: captureScreen,
+              onPressed: captureScreen(),
               child: Text('Capture and Stream'),
             ),
           ),
