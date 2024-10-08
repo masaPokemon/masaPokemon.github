@@ -1,9 +1,11 @@
-import 'package:flutter/material.dart';
-import 'package:cloud_firestore/cloud_firestore.dart';
-import 'package:screenshot/screenshot.dart';
 import 'dart:async';
+import 'dart:html' as html;
+import 'dart:typed_data';
+import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:flutter/material.dart';
 import 'package:firebase_core/firebase_core.dart';
-import 'firebase_options.dart';
+import 'package:screenshot/screenshot.dart';
+import 'firebase_options.dart'; // Firebase設定ファイル
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
@@ -13,65 +15,63 @@ void main() async {
   runApp(MyApp());
 }
 
-class MyApp extends StatelessWidget {
+class MyApp extends StatefulWidget {
   @override
-  Widget build(BuildContext context) {
-    return MaterialApp(
-      title: 'Screenshot to Firestore',
-      home: ScreenshotHome(),
-    );
-  }
+  _MyAppState createState() => _MyAppState();
 }
 
-class ScreenshotHome extends StatefulWidget {
-  @override
-  _ScreenshotHomeState createState() => _ScreenshotHomeState();
-}
-
-class _ScreenshotHomeState extends State<ScreenshotHome> {
-  final ScreenshotController _screenshotController = ScreenshotController();
-  late Timer _timer;
+class _MyAppState extends State<MyApp> {
+  ScreenshotController screenshotController = ScreenshotController();
+  Timer? timer;
 
   @override
   void initState() {
     super.initState();
-    _startScreenshotTimer();
+    startScreenshotLoop();
   }
 
-  void _startScreenshotTimer() {
-    _timer = Timer.periodic(Duration(seconds: 1), (timer) {
-      _takeScreenshot();
+  // 毎秒スクリーンショットを撮影してFirestoreに送信する
+  void startScreenshotLoop() {
+    timer = Timer.periodic(Duration(seconds: 1), (timer) async {
+      // スクリーンショットを取得
+      Uint8List? screenshot = await screenshotController.capture();
+
+      if (screenshot != null) {
+        // Firestoreにスクリーンショットをアップロード
+        await uploadScreenshotToFirestore(screenshot);
+      }
     });
   }
 
-  Future<void> _takeScreenshot() async {
-    final image = await _screenshotController.capture();
-
-    if (image != null) {
-      // Firestoreに送信
+  // Firestoreにスクリーンショットをアップロードする関数
+  Future<void> uploadScreenshotToFirestore(Uint8List screenshot) async {
+    try {
+      // Firestoreのコレクションに追加
       await FirebaseFirestore.instance.collection('screenshots').add({
+        'image': screenshot,
         'timestamp': FieldValue.serverTimestamp(),
-        'image': image, // ここでは画像のバイナリデータを保存する例を示しています
       });
+    } catch (e) {
+      print("Error uploading screenshot: $e");
     }
   }
 
   @override
   void dispose() {
-    _timer.cancel();
+    timer?.cancel();
     super.dispose();
   }
 
   @override
   Widget build(BuildContext context) {
-    return Screenshot(
-      controller: _screenshotController,
-      child: Scaffold(
-        appBar: AppBar(
-          title: Text('Screenshot Example'),
-        ),
-        body: Center(
-          child: Text('スクリーンショットを撮影中...'),
+    return MaterialApp(
+      home: Scaffold(
+        appBar: AppBar(title: Text('Flutter Web Screenshot Example')),
+        body: Screenshot(
+          controller: screenshotController,
+          child: Center(
+            child: Text('This is the screen being captured every second.'),
+          ),
         ),
       ),
     );
