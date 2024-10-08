@@ -1,77 +1,96 @@
-// main.dart
 import 'package:flutter/material.dart';
-import 'signaling.dart';
-import 'package:flutter_webrtc/flutter_webrtc.dart';
+import 'database_helper.dart';
 
 void main() {
-  runApp(MyApp());
+  runApp(KidsSearchHistoryApp());
 }
 
-class MyApp extends StatelessWidget {
+class KidsSearchHistoryApp extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return MaterialApp(
-      title: 'Screen Sharing App',
-      theme: ThemeData(
-        primarySwatch: Colors.blue,
-      ),
-      home: ScreenSharingPage(),
+      title: 'Kids Search History',
+      theme: ThemeData(primarySwatch: Colors.blue),
+      home: SearchHistoryPage(),
     );
   }
 }
 
-class ScreenSharingPage extends StatefulWidget {
+class SearchHistoryPage extends StatefulWidget {
   @override
-  _ScreenSharingPageState createState() => _ScreenSharingPageState();
+  _SearchHistoryPageState createState() => _SearchHistoryPageState();
 }
 
-class _ScreenSharingPageState extends State<ScreenSharingPage> {
-  Signaling _signaling;
-  bool _isSharing = false;
+class _SearchHistoryPageState extends State<SearchHistoryPage> {
+  final DatabaseHelper _databaseHelper = DatabaseHelper();
+  final TextEditingController _searchController = TextEditingController();
+  List<Map<String, dynamic>> _history = [];
 
   @override
   void initState() {
     super.initState();
-    _signaling = Signaling();
+    _loadHistory();
   }
 
-  void _startSharing() async {
-    await _signaling.createPeerConnection();
+  Future<void> _loadHistory() async {
+    List<Map<String, dynamic>> history = await _databaseHelper.getHistory();
     setState(() {
-      _isSharing = true;
+      _history = history;
     });
   }
 
-  void _stopSharing() async {
-    await _signaling.close();
-    setState(() {
-      _isSharing = false;
-    });
+  Future<void> _addSearchHistory() async {
+    String query = _searchController.text.trim();
+    if (query.isNotEmpty) {
+      await _databaseHelper.insertHistory(query);
+      _searchController.clear();
+      _loadHistory();
+    }
+  }
+
+  Future<void> _deleteHistory(int id) async {
+    await _databaseHelper.deleteHistory(id);
+    _loadHistory();
   }
 
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      appBar: AppBar(
-        title: Text('Screen Sharing'),
-      ),
-      body: Center(
+      appBar: AppBar(title: Text('Kids Search History')),
+      body: Padding(
+        padding: const EdgeInsets.all(16.0),
         child: Column(
-          mainAxisAlignment: MainAxisAlignment.center,
           children: [
-            ElevatedButton(
-              onPressed: _isSharing ? _stopSharing : _startSharing,
-              child: Text(_isSharing ? 'Stop Sharing' : 'Start Sharing'),
+            TextField(
+              controller: _searchController,
+              decoration: InputDecoration(
+                labelText: 'Search Query',
+                suffixIcon: IconButton(
+                  icon: Icon(Icons.add),
+                  onPressed: _addSearchHistory,
+                ),
+              ),
+            ),
+            SizedBox(height: 16),
+            Expanded(
+              child: ListView.builder(
+                itemCount: _history.length,
+                itemBuilder: (context, index) {
+                  final item = _history[index];
+                  return ListTile(
+                    title: Text(item['query']),
+                    subtitle: Text(item['date']),
+                    trailing: IconButton(
+                      icon: Icon(Icons.delete),
+                      onPressed: () => _deleteHistory(item['id']),
+                    ),
+                  );
+                },
+              ),
             ),
           ],
         ),
       ),
     );
-  }
-
-  @override
-  void dispose() {
-    _signaling.close();
-    super.dispose();
   }
 }
