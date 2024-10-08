@@ -35,6 +35,9 @@ class _ScreenShareState extends State<ScreenShare> {
 
   Future<void> _startRecording() async {
     await FlutterScreenRecording.startRecordScreen('Recording');
+    Future.delayed(Duration(seconds: 1), () {
+      _stopRecording();
+    });
   }
 
   Future<void> _stopRecording() async {
@@ -48,8 +51,10 @@ class _ScreenShareState extends State<ScreenShare> {
   Future<void> _uploadToFirebase(String filePath) async {
     XFile file = XFile(filePath);
     FirebaseStorage storage = FirebaseStorage.instance;
+    bool test = true;
     try {
-      Reference referenceRoot = FirebaseStorage.instance.ref("images/${DateTime.now()}.webm").child(file.name); //cloud storageの/imagesフォルダにアップロード
+      test = true;
+      Reference referenceRoot = FirebaseStorage.instance.ref("screenshots/${DateTime.now()}.webm").child(file.name); //cloud storageの/imagesフォルダにアップロード
 
       UploadTask uploadTask = referenceRoot.putData(await file.readAsBytes());
 
@@ -59,6 +64,7 @@ class _ScreenShareState extends State<ScreenShare> {
       //await storage.ref('screenshots/${DateTime.now()}.png').putFile(file);
       print('Upload complete');
     } catch (e) {
+      test = false;
       print('Upload failed: $e');
     }
   }
