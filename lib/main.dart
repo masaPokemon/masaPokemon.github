@@ -4,7 +4,8 @@ import 'package:screenshot/screenshot.dart';
 import 'package:firebase_core/firebase_core.dart';
 import 'firebase_options.dart';
 
-void main() {
+Future<void> main() async {
+  WidgetsFlutterBinding.ensureInitialized();
   await Firebase.initializeApp(
     options: DefaultFirebaseOptions.currentPlatform,
   );
@@ -48,7 +49,9 @@ class _ScreenCaptureState extends State<ScreenCapture> {
           color: Colors.white,
           child: Center(
             child: ElevatedButton(
-              onPressed: captureScreen(),
+              onPressed: () async {
+                captureScreen()
+              }
               child: Text('Capture and Stream'),
             ),
           ),
