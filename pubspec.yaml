@@ -8,8 +8,6 @@ environment:
 dependencies:
   flutter:
     sdk: flutter
-  firebase_core: ^2.0.0
-  cloud_firestore: ^3.0.0
   flutter_webrtc: ^0.11.7
   
 dev_dependencies:
