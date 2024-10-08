@@ -8,7 +8,7 @@ environment:
 dependencies:
   flutter:
     sdk: flutter
-  flutter_webrtc: ^0.11.7
+  flutter_webrtc: ^0.11.0
   
 dev_dependencies:
   riverpod_generator: ^2.3.11
