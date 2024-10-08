@@ -1,61 +1,77 @@
+// main.dart
 import 'package:flutter/material.dart';
-import 'package:firebase_storage/firebase_storage.dart';
-import 'package:screenshot/screenshot.dart';
-import 'package:firebase_core/firebase_core.dart';
-import 'firebase_options.dart';
+import 'signaling.dart';
+import 'package:flutter_webrtc/flutter_webrtc.dart';
 
-Future<void> main() async {
-  WidgetsFlutterBinding.ensureInitialized();
-  await Firebase.initializeApp(
-    options: DefaultFirebaseOptions.currentPlatform,
-  );
-  runApp(ScreenCapture());
-}  
-
-class ScreenCapture extends StatefulWidget {
-  @override
-  _ScreenCaptureState createState() => _ScreenCaptureState();
+void main() {
+  runApp(MyApp());
 }
 
-class _ScreenCaptureState extends State<ScreenCapture> {
-  ScreenshotController screenshotController = ScreenshotController();
+class MyApp extends StatelessWidget {
+  @override
+  Widget build(BuildContext context) {
+    return MaterialApp(
+      title: 'Screen Sharing App',
+      theme: ThemeData(
+        primarySwatch: Colors.blue,
+      ),
+      home: ScreenSharingPage(),
+    );
+  }
+}
 
-  void captureScreen() {
-    screenshotController.capture().then((image) {
-      // Send image to server or stream it
-      uploadToServer(image);
-    }).catchError((onError) {
-      print(onError);
+class ScreenSharingPage extends StatefulWidget {
+  @override
+  _ScreenSharingPageState createState() => _ScreenSharingPageState();
+}
+
+class _ScreenSharingPageState extends State<ScreenSharingPage> {
+  Signaling _signaling;
+  bool _isSharing = false;
+
+  @override
+  void initState() {
+    super.initState();
+    _signaling = Signaling();
+  }
+
+  void _startSharing() async {
+    await _signaling.createPeerConnection();
+    setState(() {
+      _isSharing = true;
     });
   }
 
-  void uploadToServer(image) async {
-    FirebaseStorage storage = FirebaseStorage.instance;
-    try {
-      await storage.ref('sample.png').putFile(image);
-    } catch (e) {
-      print(e);
-    }
+  void _stopSharing() async {
+    await _signaling.close();
+    setState(() {
+      _isSharing = false;
+    });
   }
 
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      appBar: AppBar(title: Text('Screen Capture')),
-      body: Screenshot(
-        controller: screenshotController,
-        child: Container(
-          color: Colors.white,
-          child: Center(
-            child: ElevatedButton(
-              onPressed: () async {
-                captureScreen();
-              },
-              child: Text('Capture and Stream'),
+      appBar: AppBar(
+        title: Text('Screen Sharing'),
+      ),
+      body: Center(
+        child: Column(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            ElevatedButton(
+              onPressed: _isSharing ? _stopSharing : _startSharing,
+              child: Text(_isSharing ? 'Stop Sharing' : 'Start Sharing'),
             ),
-          ),
+          ],
         ),
       ),
     );
+  }
+
+  @override
+  void dispose() {
+    _signaling.close();
+    super.dispose();
   }
 }
