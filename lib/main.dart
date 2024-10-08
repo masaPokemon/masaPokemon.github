@@ -19,7 +19,13 @@ class _ScreenCaptureState extends State<ScreenCapture> {
   }
 
   void uploadToServer(image) {
-    // Function to send image data to a streaming server or Firebase
+    final imageFile = File(image.path);
+    FirebaseStorage storage = FirebaseStorage.instance;
+    try {
+      await storage.ref('sample.png').putFile(imageFile);
+    } catch (e) {
+      print(e);
+    }
   }
 
   @override
