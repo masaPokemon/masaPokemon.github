@@ -50,7 +50,7 @@ class _ScreenCaptureState extends State<ScreenCapture> {
             child: ElevatedButton(
               onPressed: () async {
                 captureScreen();
-              }
+              },
               child: Text('Capture and Stream'),
             ),
           ),
