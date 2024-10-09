@@ -36,7 +36,7 @@ class _ProxyHistoryPageState extends State<ProxyHistoryPage> {
   Future<void> _fetchProxyHistory() async {
     try {
       // 擬似APIからデータを取得する（ここではローカルのJSONファイルなどを使うこともできます）
-      final response = await http.get(Uri.parse('https://your.api.endpoint/proxy/history'));
+      final response = await http.get(Uri.parse('https://www.cc.miyazaki-u.ac.jp/internal/proxy.pac'));
       if (response.statusCode == 200) {
         setState(() {
           _history = List<Map<String, dynamic>>.from(json.decode(response.body));
