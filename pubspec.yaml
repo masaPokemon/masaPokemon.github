@@ -8,11 +8,8 @@ environment:
 dependencies:
   flutter:
     sdk: flutter
-  firebase_core: ^2.7.0
-  firebase_storage: ^11.0.0
-  flutter_screen_recording: ^2.0.16
-  cross_file: ^0.3.4+2
-  flutter_webrtc: ^0.8.1
+  http: ^0.15.0
+  shared_preferences: ^2.0.10 # Optional: For local storage
   cupertino_icons: ^1.0.2
 
 flutter_test:
