@@ -1,7 +1,7 @@
-import 'dart:html' as html; // For accessing HTML features
+import 'dart:html' as html; // Import for web functionality
 import 'package:flutter/material.dart';
 import 'package:firebase_core/firebase_core.dart';
-import 'package:firebase_storage/firebase_storage.dart';
+import 'package:flutter_webrtc/flutter_webrtc.dart';
 import 'firebase_options.dart';
 
 void main() async {
@@ -16,79 +16,78 @@ class MyApp extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return MaterialApp(
-      title: 'Screen Capture App',
+      title: 'Classroom Screen Sharing',
       theme: ThemeData(
         primarySwatch: Colors.blue,
       ),
-      home: ScreenCapturePage(),
+      home: ClassroomPage(),
     );
   }
 }
 
-class ScreenCapturePage extends StatefulWidget {
+class ClassroomPage extends StatefulWidget {
   @override
-  _ScreenCapturePageState createState() => _ScreenCapturePageState();
+  _ClassroomPageState createState() => _ClassroomPageState();
 }
 
-class _ScreenCapturePageState extends State<ScreenCapturePage> {
-  String? _imageUrl;
+class _ClassroomPageState extends State<ClassroomPage> {
+  final List<RTCPeerConnection> _peerConnections = [];
+  final List<RTCVideoRenderer> _renderers = [];
+  final RTCVideoRenderer _localRenderer = RTCVideoRenderer();
 
-  Future<void> _captureAndUpload() async {
-    // Capture the screen
-    html.CanvasElement canvas = html.CanvasElement(
-      width: html.window.screen!.width!.toInt(),
-      height: html.window.screen!.height!.toInt(),
-    );
+  @override
+  void initState() {
+    super.initState();
+    _initRenderers();
+  }
 
-    html.CanvasRenderingContext2D context = canvas.getContext('2d')!;
+  Future<void> _initRenderers() async {
+    await _localRenderer.initialize();
+  }
 
-    // Draw the current window content on the canvas
-    context.drawImage(html.window.document!.documentElement!.querySelector('body')!, 0, 0);
-
-    // Convert the canvas to a data URL (PNG format)
-    String dataUrl = canvas.toDataUrl('image/png');
-
-    // Convert data URL to byte array
-    final byteString = html.window.atob(dataUrl.split(',')[1]);
-    final buffer = Uint8List(byteString.length);
-    for (int i = 0; i < byteString.length; i++) {
-      buffer[i] = byteString.codeUnitAt(i);
-    }
-
-    // Upload to Firebase
+  Future<void> _startScreenShare() async {
     try {
-      final storageRef = FirebaseStorage.instance.ref().child('screenshots/screenshot_${DateTime.now().millisecondsSinceEpoch}.png');
-      await storageRef.putData(buffer);
-      _imageUrl = await storageRef.getDownloadURL();
-      ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Screenshot saved to Firebase: $_imageUrl')));
+      // Get the screen stream
+      final stream = await navigator.mediaDevices.getDisplayMedia({
+        'video': {
+          'displaySurface': 'application', // Use 'browser' for browser windows
+        },
+      });
+
+      // Set local renderer
+      _localRenderer.srcObject = stream;
+
+      // Here you would usually create a peer connection
+      // and send the stream to other users
+      // This is a placeholder for further implementation
     } catch (e) {
-      print('Error uploading screenshot: $e');
-      ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Failed to upload screenshot')));
+      print('Error sharing screen: $e');
     }
+  }
+
+  @override
+  void dispose() {
+    _localRenderer.dispose();
+    super.dispose();
   }
 
   @override
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(
-        title: Text('Screen Capture'),
+        title: Text('Classroom Screen Sharing'),
       ),
-      body: Padding(
-        padding: const EdgeInsets.all(16.0),
-        child: Column(
-          mainAxisAlignment: MainAxisAlignment.center,
-          children: <Widget>[
-            ElevatedButton(
-              onPressed: _captureAndUpload,
-              child: Text('Capture Screen and Upload to Firebase'),
-            ),
-            if (_imageUrl != null) ...[
-              SizedBox(height: 20),
-              Text('Uploaded Image URL:'),
-              SelectableText(_imageUrl!),
-            ],
-          ],
-        ),
+      body: Column(
+        children: <Widget>[
+          Expanded(
+            child: RTCVideoView(_localRenderer),
+          ),
+          SizedBox(height: 20),
+          ElevatedButton(
+            onPressed: _startScreenShare,
+            child: Text('Start Screen Share'),
+          ),
+        ],
       ),
     );
   }
