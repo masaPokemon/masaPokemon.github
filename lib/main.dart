@@ -2,7 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:firebase_core/firebase_core.dart';
 import 'firebase_options.dart';  // Firebase設定ファイルをインポート
 import 'package:flutter/material.dart';
-import 'package:screen_shot/screen_shot.dart';
+import 'package:screenshot/screenshot.dart';
 import 'package:firebase_storage/firebase_storage.dart';
 import 'dart:typed_data';
 
