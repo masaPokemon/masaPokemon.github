@@ -2,6 +2,7 @@ import 'firebase_options.dart'; // Firebaseの設定ファイルをインポー�
 import 'package:flutter/material.dart';
 import 'package:flutter_webrtc/flutter_webrtc.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:firebase_core/firebase_core.dart';
 
 class BroadcasterScreen extends StatefulWidget {
   @override
