@@ -1,70 +1,67 @@
-import 'dart:convert';
 import 'package:flutter/material.dart';
-import 'package:http/http.dart' as http;
+import 'network_log.dart';
+import 'api_service.dart';
+import 'package:provider/provider.dart';
 
 void main() {
-  runApp(MyApp());
+  runApp(
+    ChangeNotifierProvider(
+      create: (context) => NetworkLogger(),
+      child: MyApp(),
+    ),
+  );
 }
 
 class MyApp extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return MaterialApp(
-      title: 'Proxy History App',
+      title: 'プロキシ通信履歴',
       theme: ThemeData(
         primarySwatch: Colors.blue,
       ),
-      home: ProxyHistoryPage(),
+      home: ProxyMonitorPage(),
     );
   }
 }
 
-class ProxyHistoryPage extends StatefulWidget {
-  @override
-  _ProxyHistoryPageState createState() => _ProxyHistoryPageState();
-}
+class ProxyMonitorPage extends StatelessWidget {
+  final ApiService apiService;
 
-class _ProxyHistoryPageState extends State<ProxyHistoryPage> {
-  List<dynamic> _history = [];
-
-  Future<void> _fetchProxyHistory() async {
-    try {
-      final response = await http.get(Uri.parse('https://www.cc.miyazaki-u.ac.jp/internal/proxy.pac'));
-      if (response.statusCode == 200) {
-        setState(() {
-          _history = json.decode(response.body);
-        });
-      } else {
-        throw Exception('Failed to load history');
-      }
-    } catch (e) {
-      print('Error fetching history: $e');
-    }
-  }
-
-  @override
-  void initState() {
-    super.initState();
-    _fetchProxyHistory();
-  }
+  ProxyMonitorPage({Key? key})
+      : apiService = ApiService(NetworkLogger()),
+        super(key: key);
 
   @override
   Widget build(BuildContext context) {
+    final logger = Provider.of<NetworkLogger>(context);
+
     return Scaffold(
       appBar: AppBar(
-        title: Text('通信履歴'),
+        title: Text('プロキシ通信履歴'),
       ),
-      body: _history.isEmpty
-          ? Center(child: CircularProgressIndicator())
-          : ListView.builder(
-              itemCount: _history.length,
+      body: Column(
+        children: [
+          ElevatedButton(
+            onPressed: () async {
+              await apiService.fetchData('https://jsonplaceholder.typicode.com/posts/1');
+            },
+            child: Text('データを取得'),
+          ),
+          Expanded(
+            child: ListView.builder(
+              itemCount: logger.logs.length,
               itemBuilder: (context, index) {
+                final log = logger.logs[index];
                 return ListTile(
-                  title: Text(_history[index]['url']),
-                  subtitle: Text('Method: ${_history[index]['method']}'),
+                  title: Text(log.url),
+                  subtitle: Text('Method: ${log.method}\nResponse: ${log.response}'),
                 );
               },
             ),
+          ),
+        ],
+      ),
     );
   }
 }
