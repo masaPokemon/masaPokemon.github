@@ -20,7 +20,6 @@ class _ScreenCapturePageState extends State<ScreenCapturePage> {
 
       if (image != null) {
         // 一時ディレクトリに保存
-        final directory = await getTemporaryDirectory();
         final imagePath = 'screenshots/screenshot.png';
         final file = File(imagePath);
         await file.writeAsBytes(image);
