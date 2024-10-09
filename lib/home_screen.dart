@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'broadcasterScreen.dart';
+import 'viewScreen.dart';
 
 class HomeScreen extends StatelessWidget {
   @override
