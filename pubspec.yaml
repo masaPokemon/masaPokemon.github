@@ -8,7 +8,7 @@ environment:
 dependencies:
   flutter:
     sdk: flutter
-  http: ^0.15.0
+  http: ^1.2.2
   shared_preferences: ^2.0.10 # Optional: For local storage
   cupertino_icons: ^1.0.2
 
