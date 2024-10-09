@@ -70,7 +70,7 @@ class _BroadcasterScreenState extends State<BroadcasterScreen> {
         children: [
           Expanded(
             child: _localStream != null
-                ? RTCVideoView(_localStream!.getVideoTracks()[0])
+                ? RTCVideoView(_localStream!.getVideoTracks())
                 : Center(child: Text('Starting stream...')),
           ),
         ],
