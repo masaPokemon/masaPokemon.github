@@ -41,7 +41,7 @@ class _ScreenCapturePageState extends State<ScreenCapturePage> {
     }
   }
 
-  Future<void> _uploadImage(Uint8List image) async {
+  Future<void> _uploadImage(image) async {
     // Firebase Storageにアップロード
     final storageRef = FirebaseStorage.instance.ref().child('screenshots/${DateTime.now().millisecondsSinceEpoch}.png');
     await storageRef.putData(image);
