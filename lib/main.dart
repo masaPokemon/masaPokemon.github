@@ -1,16 +1,12 @@
 import 'package:flutter/material.dart';
 import 'package:firebase_core/firebase_core.dart';
-import 'firebase_options.dart';  // Firebase設定ファイルをインポート
-import 'package:flutter/material.dart';
-import 'package:screenshot/screenshot.dart';
 import 'package:firebase_storage/firebase_storage.dart';
-import 'dart:typed_data';
+import 'package:screenshot/screenshot.dart';
+import 'firebase_options.dart'; // Firebaseの設定ファイルをインポート
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
-  await Firebase.initializeApp(
-    options: DefaultFirebaseOptions.currentPlatform,
-  );
+  await Firebase.initializeApp(options: DefaultFirebaseOptions.currentPlatform);
   runApp(MyApp());
 }
 
@@ -18,85 +14,72 @@ class MyApp extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return MaterialApp(
-      title: 'Screen Streaming App',
+      title: 'Screen Distribution App',
       theme: ThemeData(
         primarySwatch: Colors.blue,
       ),
-      home: HomeScreen(),
+      home: ScreenCapturePage(),
     );
   }
 }
 
-class HomeScreen extends StatefulWidget {
+class ScreenCapturePage extends StatefulWidget {
   @override
-  _HomeScreenState createState() => _HomeScreenState();
+  _ScreenCapturePageState createState() => _ScreenCapturePageState();
 }
 
-class _HomeScreenState extends State<HomeScreen> {
-  final ScreenshotController _screenShotController = ScreenshotController();
-  bool _isUploading = false;
+class _ScreenCapturePageState extends State<ScreenCapturePage> {
+  final ScreenshotController _screenshotController = ScreenshotController();
   String? _downloadUrl;
 
-  Future<void> _captureAndUploadScreen() async {
+  Future<void> _captureAndUpload() async {
+    // 画面をキャプチャ
+    final image = await _screenshotController.capture();
+    if (image != null) {
+      // 画像をFirebaseにアップロード
+      await _uploadImage(image);
+    }
+  }
+
+  Future<void> _uploadImage(Uint8List image) async {
+    // Firebase Storageにアップロード
+    final storageRef = FirebaseStorage.instance.ref().child('screenshots/${DateTime.now().millisecondsSinceEpoch}.png');
+    await storageRef.putData(image);
+    final downloadUrl = await storageRef.getDownloadURL();
+
     setState(() {
-      _isUploading = true;
+      _downloadUrl = downloadUrl;
     });
 
-    try {
-      // 画面のキャプチャ
-      Uint8List? capturedImage = await _screenShotController.capture();
-
-      if (capturedImage != null) {
-        // Firebase Storageにアップロード
-        String fileName = 'screenshots/screen_${DateTime.now().millisecondsSinceEpoch}.png';
-        Reference firebaseStorageRef = FirebaseStorage.instance.ref().child(fileName);
-        UploadTask uploadTask = firebaseStorageRef.putData(capturedImage);
-        TaskSnapshot snapshot = await uploadTask;
-        
-        // ダウンロードURLの取得
-        String downloadUrl = await snapshot.ref.getDownloadURL();
-        
-        setState(() {
-          _downloadUrl = downloadUrl;
-        });
-        
-        print('Uploaded to Firebase: $downloadUrl');
-      }
-    } catch (e) {
-      print('エラーが発生しました: $e');
-    } finally {
-      setState(() {
-        _isUploading = false;
-      });
-    }
+    ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('画像がアップロードされました: $downloadUrl')));
   }
 
   @override
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(
-        title: Text('Screen Streaming'),
+        title: Text('画面配信アプリ'),
       ),
-      body: Center(
-        child: _isUploading
-            ? CircularProgressIndicator()
-            : Column(
-                mainAxisAlignment: MainAxisAlignment.center,
-                children: [
-                  ElevatedButton(
-                    onPressed: _captureAndUploadScreen,
-                    child: Text('画面をキャプチャしてアップロード'),
-                  ),
-                  if (_downloadUrl != null)
-                    Column(
-                      children: [
-                        Text('アップロード成功:'),
-                        Text(_downloadUrl!),
-                        Image.network(_downloadUrl!),
-                      ],
-                    ),
-                ],
+      body: Screenshot(
+        controller: _screenshotController,
+        child: Center(
+          child: Column(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              Text('画面をキャプチャしてFirebaseにアップロードします。'),
+              SizedBox(height: 20),
+              ElevatedButton(
+                onPressed: _captureAndUpload,
+                child: Text('画面をキャプチャしてアップロード'),
               ),
+              if (_downloadUrl != null) ...[
+                SizedBox(height: 20),
+                Text('アップロードされた画像:'),
+                Image.network(_downloadUrl!),
+              ],
+            ],
+          ),
+        ),
       ),
     );
   }
