@@ -10,6 +10,8 @@ dependencies:
     sdk: flutter
   firebase_core: ^2.4.0
   firebase_storage: ^11.1.0
+  flutter_webrtc: ^0.8.0
+
   
   http: ^1.2.2
   shared_preferences: ^2.0.10 # Optional: For local storage
