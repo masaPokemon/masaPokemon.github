@@ -20,7 +20,7 @@ class MyApp extends StatelessWidget {
       theme: ThemeData(
         primarySwatch: Colors.blue,
       ),
-      home: ScreenSharingPage(),
+      home: _ScreenSharingPageState(),
     );
   }
 }
@@ -30,7 +30,7 @@ class ScreenSharingPage extends StatefulWidget {
   _ScreenSharingPageState createState() => _ScreenSharingPageState();
 }
 
-class _ScreenSharingPageState extends State<ScreenSharingPage> {
+class _ScreenSharingPageState extends State<MyApp> {
   bool _isRecording = false;
   String? _filePath;
 
