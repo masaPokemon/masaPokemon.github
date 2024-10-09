@@ -21,7 +21,7 @@ class _ScreenCapturePageState extends State<ScreenCapturePage> {
       if (image != null) {
         // 一時ディレクトリに保存
         final imagePath = 'screenshots/screenshot.png';
-        final file = File(imagePath);
+        final file = XFile(imagePath);
         await file.writeAsBytes(image);
 
         // Firebase Storageにアップロード
