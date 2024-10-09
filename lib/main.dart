@@ -1,92 +1,94 @@
 import 'firebase_options.dart'; // Firebaseの設定ファイルをインポート
-import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_webrtc/flutter_webrtc.dart';
+import 'package:firebase_core/firebase_core.dart';
+import 'package:firebase_database/firebase_database.dart';
 
-class Signaling {
-  final FirebaseFirestore _firestore = FirebaseFirestore.instance;
-
-  Future<void> createOffer(String roomId, String offer) async {
-    await _firestore.collection('rooms').doc(roomId).set({'offer': offer});
-  }
-
-  Future<void> createAnswer(String roomId, String answer) async {
-    await _firestore.collection('rooms').doc(roomId).update({'answer': answer});
-  }
-
-  Stream<DocumentSnapshot> getRoom(String roomId) {
-    return _firestore.collection('rooms').doc(roomId).snapshots();
-  }
+void main() async {
+  WidgetsFlutterBinding.ensureInitialized();
+  await Firebase.initializeApp(options: DefaultFirebaseOptions.currentPlatform);
+  runApp(MyApp());
 }
 
-class StreamScreen extends StatefulWidget {
-  final String roomId;
-
-  StreamScreen({required this.roomId});
-
+class MyApp extends StatelessWidget {
   @override
-  _StreamScreenState createState() => _StreamScreenState();
+  Widget build(BuildContext context) {
+    return MaterialApp(
+      home: BroadcasterScreen(),
+    );
+  }
 }
 
-class _StreamScreenState extends State<StreamScreen> {
-  late RTCPeerConnection _peerConnection;
-  late MediaStream _localStream;
-  final Signaling _signaling = Signaling();
+class BroadcasterScreen extends StatefulWidget {
+  @override
+  _BroadcasterScreenState createState() => _BroadcasterScreenState();
+}
+
+class _BroadcasterScreenState extends State<BroadcasterScreen> {
+  RTCPeerConnection? _peerConnection;
+  final DatabaseReference _dbRef = FirebaseDatabase.instance.reference().child('signaling');
+  final _localRenderer = RTCVideoRenderer();
+  MediaStream? _localStream;
 
   @override
   void initState() {
     super.initState();
-    _initialize();
-  }
-
-  Future<void> _initialize() async {
-    // MediaStreamの作成
-    _localStream = await navigator.mediaDevices.getUserMedia({'video': true, 'audio': true});
-
-    // RTCPeerConnectionの作成
-    _peerConnection = await createPeerConnection({...});
-    
-    _localStream.getTracks().forEach((track) {
-      _peerConnection.addTrack(track, _localStream);
-    });
-
-    // Offerの作成
-    final offer = await _peerConnection.createOffer();
-    await _peerConnection.setLocalDescription(offer);
-    
-    // FirebaseにOfferを送信
-    _signaling.createOffer(widget.roomId, offer.sdp!);
-
-    // FirestoreからのAnswerの取得
-    _signaling.getRoom(widget.roomId).listen((snapshot) {
-      if (snapshot.exists) {
-        final data = snapshot.data()!;
-        if (data['answer'] != null) {
-          _peerConnection.setRemoteDescription(RTCSessionDescription(data['answer'], 'answer'));
-        }
-      }
-    });
+    _initializeRenderer();
+    _startBroadcast();
   }
 
   @override
   void dispose() {
-    _localStream.dispose();
-    _peerConnection.close();
+    _localRenderer.dispose();
     super.dispose();
+  }
+
+  Future<void> _initializeRenderer() async {
+    await _localRenderer.initialize();
+  }
+
+  Future<void> _startBroadcast() async {
+    // カメラや画面のストリームを取得
+    _localStream = await navigator.mediaDevices.getDisplayMedia({'video': true});
+
+    // WebRTCの接続設定
+    Map<String, dynamic> config = {
+      'iceServers': [
+        {'urls': 'stun:stun.l.google.com:19302'},
+      ]
+    };
+
+    _peerConnection = await createPeerConnection(config);
+
+    _localStream!.getTracks().forEach((track) {
+      _peerConnection!.addTrack(track, _localStream!);
+    });
+
+    // Firebaseにオファーを保存
+    var offer = await _peerConnection!.createOffer();
+    await _peerConnection!.setLocalDescription(offer);
+    _dbRef.child('offer').set(offer.toMap());
+
+    _peerConnection!.onIceCandidate = (RTCIceCandidate candidate) {
+      if (candidate != null) {
+        _dbRef.child('ice_candidates').push().set(candidate.toMap());
+      }
+    };
+
+    setState(() {
+      _localRenderer.srcObject = _localStream;
+    });
   }
 
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      appBar: AppBar(title: Text('配信画面')),
-      body: RTCVideoView(_localStream.videoTracks[0]),
+      appBar: AppBar(
+        title: Text('Broadcaster'),
+      ),
+      body: Center(
+        child: RTCVideoView(_localRenderer),
+      ),
     );
   }
-}
-
-
-void main() async {
-  WidgetsFlutterBinding.ensureInitialized();
-  await Firebase.initializeApp(options: DefaultFirebaseOptions.currentPlatform);
-  runApp(StreamScreen('1223'));
 }
