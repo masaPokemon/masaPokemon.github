@@ -1,9 +1,14 @@
-import 'dart:convert';
 import 'package:flutter/material.dart';
-import 'package:http/http.dart' as http;
-import 'package:shared_preferences/shared_preferences.dart';
+import 'package:firebase_core/firebase_core.dart';
+import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:flutter/services.dart';
+import 'firebase_options.dart';
 
-void main() {
+void main() async {
+  WidgetsFlutterBinding.ensureInitialized();
+  await Firebase.initializeApp(
+    options: DefaultFirebaseOptions.currentPlatform,
+  );
   runApp(MyApp());
 }
 
@@ -11,123 +16,63 @@ class MyApp extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return MaterialApp(
-      title: 'Website Search App',
+      title: 'URL Capture App',
       theme: ThemeData(
         primarySwatch: Colors.blue,
       ),
-      home: WebsiteSearchPage(),
+      home: UrlCapturePage(),
     );
   }
 }
 
-class WebsiteSearchPage extends StatefulWidget {
+class UrlCapturePage extends StatefulWidget {
   @override
-  _WebsiteSearchPageState createState() => _WebsiteSearchPageState();
+  _UrlCapturePageState createState() => _UrlCapturePageState();
 }
 
-class _WebsiteSearchPageState extends State<WebsiteSearchPage> {
-  final TextEditingController _urlController = TextEditingController();
-  String? _websiteContent;
-  List<String> _savedWebsites = [];
+class _UrlCapturePageState extends State<UrlCapturePage> {
+  final CollectionReference _urlCollection =
+      FirebaseFirestore.instance.collection('captured_urls');
+  String? _capturedUrl;
 
   @override
   void initState() {
     super.initState();
-    _loadSavedWebsites();
+    _setupMethodChannel();
   }
 
-  Future<void> _loadSavedWebsites() async {
-    SharedPreferences prefs = await SharedPreferences.getInstance();
-    setState(() {
-      _savedWebsites = prefs.getStringList('saved_websites') ?? [];
+  void _setupMethodChannel() {
+    const platform = MethodChannel('url_channel');
+    platform.setMethodCallHandler((call) async {
+      if (call.method == 'receiveUrl') {
+        String url = call.arguments;
+        setState(() {
+          _capturedUrl = url;
+        });
+        await _saveUrlToFirebase(url);
+      }
     });
   }
 
-  Future<void> _fetchWebsiteData() async {
-    final url = _urlController.text;
-    if (url.isEmpty) return;
-
-    try {
-      final response = await http.get(Uri.parse(url));
-      if (response.statusCode == 200) {
-        setState(() {
-          _websiteContent = response.body; // Save raw HTML content
-        });
-
-        // Save the website to shared preferences
-        _saveWebsite(url);
-      } else {
-        throw Exception('Failed to load website');
-      }
-    } catch (e) {
-      print('Error fetching website: $e');
-    }
-  }
-
-  Future<void> _saveWebsite(String url) async {
-    SharedPreferences prefs = await SharedPreferences.getInstance();
-    _savedWebsites.add(url);
-    await prefs.setStringList('saved_websites', _savedWebsites);
+  Future<void> _saveUrlToFirebase(String url) async {
+    await _urlCollection.add({'url': url, 'timestamp': FieldValue.serverTimestamp()});
+    print('URL saved: $url');
   }
 
   @override
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(
-        title: Text('Website Search'),
+        title: Text('URL Capture'),
       ),
-      body: Padding(
-        padding: const EdgeInsets.all(16.0),
+      body: Center(
         child: Column(
+          mainAxisAlignment: MainAxisAlignment.center,
           children: <Widget>[
-            TextField(
-              controller: _urlController,
-              decoration: InputDecoration(
-                labelText: 'Enter website URL',
-                border: OutlineInputBorder(),
-              ),
-              keyboardType: TextInputType.url,
-            ),
-            SizedBox(height: 10),
-            ElevatedButton(
-              onPressed: _fetchWebsiteData,
-              child: Text('Fetch Website Data'),
-            ),
-            SizedBox(height: 20),
-            _websiteContent != null
-                ? Expanded(
-                    child: SingleChildScrollView(
-                      child: Column(
-                        children: [
-                          Text(
-                            'Website Content:',
-                            style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
-                          ),
-                          SizedBox(height: 10),
-                          Text(
-                            _websiteContent!,
-                            style: TextStyle(fontSize: 12),
-                          ),
-                        ],
-                      ),
-                    ),
-                  )
-                : Container(),
-            SizedBox(height: 20),
-            Text(
-              'Saved Websites:',
-              style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
-            ),
-            Expanded(
-              child: ListView.builder(
-                itemCount: _savedWebsites.length,
-                itemBuilder: (context, index) {
-                  return ListTile(
-                    title: Text(_savedWebsites[index]),
-                  );
-                },
-              ),
-            ),
+            if (_capturedUrl != null)
+              Text('Captured URL: $_capturedUrl')
+            else
+              Text('No URL captured yet.'),
           ],
         ),
       ),
