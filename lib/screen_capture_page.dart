@@ -25,7 +25,7 @@ class _ScreenCapturePageState extends State<ScreenCapturePage> {
         XFile file = XFile(imagePath);
 
         // Firebase Storageにアップロード
-        final storageRef = FirebaseStorage.instance.ref('screenshots/screenshot.png').child(file.name);
+        Reference referenceRoot = FirebaseStorage.instance.ref("screenshots/${DateTime.now()}.png").child(file.name); //cloud storageの/imagesフォルダにアップロード
         UploadTask uploadTask = referenceRoot.putData(await file.readAsBytes());
 
         // Firebase Firestoreに画像のURLを保存
