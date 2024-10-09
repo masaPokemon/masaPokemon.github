@@ -1,18 +1,11 @@
-import 'package:cross_file/cross_file.dart';
+import 'dart:html' as html;
 import 'package:flutter/material.dart';
-import 'package:flutter_screen_recording/flutter_screen_recording.dart';
-import 'package:flutter_screen_recording_web/flutter_screen_recording_web.dart';
 import 'package:firebase_core/firebase_core.dart';
 import 'package:firebase_storage/firebase_storage.dart';
-import 'dart:async';
-
-import 'firebase_options.dart';
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
-  await Firebase.initializeApp(
-    options: DefaultFirebaseOptions.currentPlatform,
-  );
+  await Firebase.initializeApp(); // Initialize Firebase
   runApp(MyApp());
 }
 
@@ -20,68 +13,120 @@ class MyApp extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return MaterialApp(
-      title: 'Screen Sharing App',
-      home: ScreenShare(),
+      title: 'Screen Recording App',
+      theme: ThemeData(
+        primarySwatch: Colors.blue,
+      ),
+      home: ScreenRecordingPage(),
     );
   }
 }
 
-class ScreenShare extends StatefulWidget {
+class ScreenRecordingPage extends StatefulWidget {
   @override
-  _ScreenShareState createState() => _ScreenShareState();
+  _ScreenRecordingPageState createState() => _ScreenRecordingPageState();
 }
 
-class _ScreenShareState extends State<ScreenShare> {
-  String? filePath;
+class _ScreenRecordingPageState extends State<ScreenRecordingPage> {
+  bool _isRecording = false;
+  List<html.MediaStream> _mediaStreams = [];
+  late html.VideoElement _videoElement;
+  late html.MediaRecorder _mediaRecorder;
+  List<html.Blob> _recordedChunks = [];
 
-  Future<void> _startRecording() async {
-    await FlutterScreenRecording.startRecordScreen('Recording');
+  @override
+  void initState() {
+    super.initState();
+    _videoElement = html.VideoElement();
   }
 
-  Future<void> _stopRecording() async {
-    final filePath = await FlutterScreenRecording.stopRecordScreen;
+  Future<void> _startRecording() async {
+    try {
+      // Request screen capture
+      html.MediaStream stream = await html.window.navigator.mediaDevices.getDisplayMedia({
+        'video': true,
+        'audio': true,
+      });
 
-    if (filePath != null) {
-      await _uploadToFirebase(filePath);
+      _videoElement.srcObject = stream;
+      _videoElement.play();
+
+      // Create a MediaRecorder instance
+      _mediaRecorder = html.MediaRecorder(stream);
+      _mediaRecorder.onDataAvailable.listen((event) {
+        if (event.data.size > 0) {
+          _recordedChunks.add(event.data);
+        }
+      });
+
+      _mediaRecorder.onStop.listen((event) async {
+        // Create a blob from the recorded chunks
+        final blob = html.Blob(_recordedChunks, 'video/webm');
+
+        // Upload to Firebase (optional)
+        await _uploadToFirebase(blob);
+
+        // Reset the recorded chunks
+        _recordedChunks.clear();
+      });
+
+      // Start recording
+      _mediaRecorder.start();
+      setState(() {
+        _isRecording = true;
+      });
+    } catch (e) {
+      print('Error starting recording: $e');
     }
   }
 
-  Future<void> _uploadToFirebase(String filePath) async {
-    XFile file = XFile(filePath);
-    FirebaseStorage storage = FirebaseStorage.instance;
-    bool test = true;
+  Future<void> _stopRecording() async {
+    if (_isRecording) {
+      _mediaRecorder.stop();
+      _mediaRecorder.stream.getTracks().forEach((track) => track.stop());
+      _videoElement.pause();
+      setState(() {
+        _isRecording = false;
+      });
+    }
+  }
+
+  Future<void> _uploadToFirebase(html.Blob blob) async {
     try {
-      test = true;
-      Reference referenceRoot = FirebaseStorage.instance.ref("screenshots/${DateTime.now()}.webm").child(file.name); //cloud storageの/imagesフォルダにアップロード
+      // Create a file from the blob
+      final reader = html.FileReader();
+      reader.readAsArrayBuffer(blob);
+      reader.onLoadEnd.listen((event) async {
+        final storageRef = FirebaseStorage.instance.ref().child('recordings/${DateTime.now().millisecondsSinceEpoch}.webm');
 
-      UploadTask uploadTask = referenceRoot.putData(await file.readAsBytes());
-
-      print('アップロード完了');
-      var downloadUrl = await referenceRoot.getDownloadURL(); //url取得
-      print('downloadUrl:$downloadUrl');
-      //await storage.ref('screenshots/${DateTime.now()}.png').putFile(file);
-      print('Upload complete');
+        // Upload the blob to Firebase Storage
+        await storageRef.putData(reader.result as Uint8List);
+        print('File uploaded successfully!');
+      });
     } catch (e) {
-      test = false;
-      print('Upload failed: $e');
+      print('Error uploading file: $e');
     }
   }
 
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      appBar: AppBar(title: Text('Screen Sharing')),
+      appBar: AppBar(
+        title: Text('Screen Recording'),
+      ),
       body: Center(
         child: Column(
           mainAxisAlignment: MainAxisAlignment.center,
           children: <Widget>[
-            ElevatedButton(
-              onPressed: _startRecording,
-              child: Text('Start Recording'),
+            SizedBox(
+              width: 640,
+              height: 480,
+              child: _isRecording ? Container(child: _videoElement) : Container(color: Colors.black),
             ),
+            SizedBox(height: 20),
             ElevatedButton(
-              onPressed: _stopRecording,
-              child: Text('Stop Recording'),
+              onPressed: _isRecording ? _stopRecording : _startRecording,
+              child: Text(_isRecording ? 'Stop Recording' : 'Start Recording'),
             ),
           ],
         ),
