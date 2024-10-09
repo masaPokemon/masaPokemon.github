@@ -24,30 +24,30 @@ class ProxyInfoPage extends StatefulWidget {
 }
 
 class _ProxyInfoPageState extends State<ProxyInfoPage> {
-  String _proxyInfo = 'プロキシ情報を取得中...';
+  String _pacContent = '取得中...';
 
   @override
   void initState() {
     super.initState();
-    _fetchProxyInfo();
+    _fetchPacFile();
   }
 
-  Future<void> _fetchProxyInfo() async {
+  Future<void> _fetchPacFile() async {
     try {
-      // 指定されたURLからproxy.pacファイルを取得
+      // PACファイルを取得
       final response = await http.get(Uri.parse('https://www.cc.miyazaki-u.ac.jp/internal/proxy.pac'));
       if (response.statusCode == 200) {
         setState(() {
-          _proxyInfo = response.body; // 取得したPACファイルの内容を表示
+          _pacContent = response.body;
         });
       } else {
         setState(() {
-          _proxyInfo = 'データの取得に失敗しました';
+          _pacContent = 'PACファイルの取得に失敗しました: ${response.statusCode}';
         });
       }
     } catch (e) {
       setState(() {
-        _proxyInfo = 'エラー: $e';
+        _pacContent = 'エラー: $e';
       });
     }
   }
@@ -60,7 +60,7 @@ class _ProxyInfoPageState extends State<ProxyInfoPage> {
       ),
       body: SingleChildScrollView(
         padding: EdgeInsets.all(16.0),
-        child: Text(_proxyInfo),
+        child: Text(_pacContent, style: TextStyle(fontFamily: 'Courier', fontSize: 14)),
       ),
     );
   }
