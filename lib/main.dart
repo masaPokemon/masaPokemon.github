@@ -3,10 +3,11 @@ import 'package:flutter/material.dart';
 import 'package:firebase_core/firebase_core.dart';
 import 'package:firebase_storage/firebase_storage.dart';
 import 'package:flutter_screen_recording/flutter_screen_recording.dart';
+import 'firebase_options.dart';
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
-  await Firebase.initializeApp(
+    await Firebase.initializeApp(
     options: DefaultFirebaseOptions.currentPlatform,
   );
   runApp(MyApp());
@@ -31,13 +32,13 @@ class ScreenRecordingPage extends StatefulWidget {
 }
 
 class _ScreenRecordingPageState extends State<ScreenRecordingPage> {
-  String? _recordingFilePath;
+  bool _recordingFilePath;
   bool _isRecording = false;
 
   Future<void> _startRecording() async {
     try {
       // 録画を開始
-      _recordingFilePath = await FlutterScreenRecording.startRecordScreen();
+      _recordingFilePath = await FlutterScreenRecording.startRecordScreen('tatumoto');
       setState(() {
         _isRecording = true;
       });
