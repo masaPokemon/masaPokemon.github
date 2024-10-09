@@ -29,6 +29,7 @@ class ScreenCapturePage extends StatefulWidget {
 }
 
 class _ScreenCapturePageState extends State<ScreenCapturePage> {
+  Timer? _timer;
   final ScreenshotController _screenshotController = ScreenshotController();
   String? _downloadUrl;
 
