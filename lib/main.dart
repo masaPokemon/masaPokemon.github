@@ -1,8 +1,8 @@
+import 'firebase_options.dart';
 import 'dart:html' as html; // Import for web functionality
 import 'package:flutter/material.dart';
 import 'package:firebase_core/firebase_core.dart';
-import 'package:flutter_webrtc/flutter_webrtc.dart';
-import 'firebase_options.dart';
+import 'package:firebase_storage/firebase_storage.dart';
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
@@ -16,78 +16,76 @@ class MyApp extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return MaterialApp(
-      title: 'Classroom Screen Sharing',
+      title: 'Student Monitoring App',
       theme: ThemeData(
         primarySwatch: Colors.blue,
       ),
-      home: ClassroomPage(),
+      home: StudentScreen(),
     );
   }
 }
 
-class ClassroomPage extends StatefulWidget {
+class StudentScreen extends StatefulWidget {
   @override
-  _ClassroomPageState createState() => _ClassroomPageState();
+  _StudentScreenState createState() => _StudentScreenState();
 }
 
-class _ClassroomPageState extends State<ClassroomPage> {
-  final List<RTCPeerConnection> _peerConnections = [];
-  final List<RTCVideoRenderer> _renderers = [];
-  final RTCVideoRenderer _localRenderer = RTCVideoRenderer();
+class _StudentScreenState extends State<StudentScreen> {
+  final FirebaseStorage _storage = FirebaseStorage.instance;
 
-  @override
-  void initState() {
-    super.initState();
-    _initRenderers();
-  }
-
-  Future<void> _initRenderers() async {
-    await _localRenderer.initialize();
-  }
-
-  Future<void> _startScreenShare() async {
+  Future<void> _captureScreen() async {
     try {
       // Get the screen stream
-      final stream = await navigator.mediaDevices.getDisplayMedia({
+      final stream = await html.window.navigator.mediaDevices.getDisplayMedia({
         'video': {
-          'displaySurface': 'application', // Use 'browser' for browser windows
+          'displaySurface': 'monitor', // Capture the entire monitor
         },
       });
 
-      // Set local renderer
-      _localRenderer.srcObject = stream;
+      // Create a canvas to capture the video stream
+      final videoElement = html.VideoElement()..srcObject = stream;
+      final canvas = html.CanvasElement(width: 1280, height: 720);
+      final context = canvas.getContext('2d')!;
+      videoElement.play();
 
-      // Here you would usually create a peer connection
-      // and send the stream to other users
-      // This is a placeholder for further implementation
+      // Draw the video frame to the canvas
+      videoElement.onLoadedData.listen((_) {
+        context.drawImage(videoElement, 0, 0);
+        _uploadImage(canvas.toDataUrl('image/png'));
+      });
     } catch (e) {
-      print('Error sharing screen: $e');
+      print('Error capturing screen: $e');
     }
   }
 
-  @override
-  void dispose() {
-    _localRenderer.dispose();
-    super.dispose();
+  Future<void> _uploadImage(String dataUrl) async {
+    // Convert base64 data URL to a Blob
+    final base64String = dataUrl.split(',')[1];
+    final blob = html.Blob([html.window.atob(base64String)], 'image/png');
+
+    // Create a file from the Blob
+    final file = html.File([blob], 'screenshot.png', {'type': 'image/png'});
+
+    // Upload the file to Firebase Storage
+    try {
+      await _storage.ref('screenshots/${file.name}').putBlob(blob);
+      print('Screenshot uploaded successfully');
+    } catch (e) {
+      print('Error uploading image: $e');
+    }
   }
 
   @override
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(
-        title: Text('Classroom Screen Sharing'),
+        title: Text('Student Monitoring App'),
       ),
-      body: Column(
-        children: <Widget>[
-          Expanded(
-            child: RTCVideoView(_localRenderer),
-          ),
-          SizedBox(height: 20),
-          ElevatedButton(
-            onPressed: _startScreenShare,
-            child: Text('Start Screen Share'),
-          ),
-        ],
+      body: Center(
+        child: ElevatedButton(
+          onPressed: _captureScreen,
+          child: Text('Capture Screen'),
+        ),
       ),
     );
   }
