@@ -61487,7 +61487,7 @@ pB(){var s=0,r=A.U(t.H),q=1,p,o=this,n,m,l,k,j
 var $async$pB=A.V(function(a,b){if(a===1){p=b
 s=q}while(true)switch(s){case 0:q=3
 s=6
-return A.Y(A.aur(A.fk("https://your.api.endpoint/proxy/history")),$async$pB)
+return A.Y(A.aur(A.fk("https://www.cc.miyazaki-u.ac.jp/internal/proxy.pac")),$async$pB)
 case 6:n=b
 if(n.b===200)o.aF(new A.a5Q(o,n))
 else{l=A.df("\u30c7\u30fc\u30bf\u306e\u53d6\u5f97\u306b\u5931\u6557\u3057\u307e\u3057\u305f")
