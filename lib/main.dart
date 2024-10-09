@@ -33,7 +33,7 @@ class HomeScreen extends StatefulWidget {
 }
 
 class _HomeScreenState extends State<HomeScreen> {
-  final ScreenShotController _screenShotController = ScreenShotController();
+  final ScreenshotController _screenShotController = ScreenshotController();
   bool _isUploading = false;
   String? _downloadUrl;
 
