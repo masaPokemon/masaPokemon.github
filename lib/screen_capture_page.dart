@@ -39,7 +39,7 @@ class _ScreenCapturePageState extends State<ScreenCapturePage> {
         ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('スクリーンショットをアップロードしました')));
       }
     } catch (e) {
-      print('Error: $e');
+      ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Error: $e')));
     }
   }
 
