@@ -1,8 +1,11 @@
-import 'firebase_options.dart';
-import 'dart:html' as html; // Import for web functionality
+import 'package:cross_file/cross_file.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter_screen_recording/flutter_screen_recording.dart';
 import 'package:firebase_core/firebase_core.dart';
 import 'package:firebase_storage/firebase_storage.dart';
+import 'dart:async';
+
+import 'firebase_options.dart';
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
@@ -16,75 +19,70 @@ class MyApp extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return MaterialApp(
-      title: 'Student Monitoring App',
-      theme: ThemeData(
-        primarySwatch: Colors.blue,
-      ),
-      home: StudentScreen(),
+      title: 'Screen Sharing App',
+      home: ScreenShare(),
     );
   }
 }
 
-class StudentScreen extends StatefulWidget {
+class ScreenShare extends StatefulWidget {
   @override
-  _StudentScreenState createState() => _StudentScreenState();
+  _ScreenShareState createState() => _ScreenShareState();
 }
 
-class _StudentScreenState extends State<StudentScreen> {
-  final FirebaseStorage _storage = FirebaseStorage.instance;
+class _ScreenShareState extends State<ScreenShare> {
+  String? filePath;
 
-  Future<void> _captureScreen() async {
-    try {
-      // Get the screen stream
-      final stream = await html.window.navigator.mediaDevices.getDisplayMedia({
-        'video': {
-          'displaySurface': 'monitor', // Capture the entire monitor
-        },
-      });
+  Future<void> _startRecording() async {
+    await FlutterScreenRecording.startRecordScreen('Recording');
+  }
 
-      // Create a canvas to capture the video stream
-      final videoElement = html.VideoElement()..srcObject = stream;
-      final canvas = html.CanvasElement(width: 1280, height: 720);
-      final context = canvas.getContext('2d')!;
-      videoElement.play();
+  Future<void> _stopRecording() async {
+    final filePath = await FlutterScreenRecording.stopRecordScreen;
 
-      // Draw the video frame to the canvas
-      videoElement.onLoadedData.listen((_) {
-        context.drawImage(videoElement, 0, 0);
-        _uploadImage(canvas.toDataUrl('image/png'));
-      });
-    } catch (e) {
-      print('Error capturing screen: $e');
+    if (filePath != null) {
+      await _uploadToFirebase(filePath);
     }
   }
 
-  Future<void> _uploadImage(String dataUrl) async {
-    // Convert base64 data URL to a Blob
-    final base64String = dataUrl.split(',')[1];
-    final blob = html.Blob([html.window.atob(base64String)], 'image/png');
-
-    // Create a file from the Blob
-    final file = html.File([blob], 'screenshot.png', {'type': 'image/png'});
-
-    // Upload the file to Firebase Storage
+  Future<void> _uploadToFirebase(String filePath) async {
+    XFile file = XFile(filePath);
+    FirebaseStorage storage = FirebaseStorage.instance;
+    bool test = true;
     try {
-      await _storage.ref('screenshots/${file.name}').putBlob(blob);
-      print('Screenshot uploaded successfully');
+      test = true;
+      Reference referenceRoot = FirebaseStorage.instance.ref("screenshots/${DateTime.now()}.webm").child(file.name); //cloud storageの/imagesフォルダにアップロード
+
+      UploadTask uploadTask = referenceRoot.putData(await file.readAsBytes());
+
+      print('アップロード完了');
+      var downloadUrl = await referenceRoot.getDownloadURL(); //url取得
+      print('downloadUrl:$downloadUrl');
+      //await storage.ref('screenshots/${DateTime.now()}.png').putFile(file);
+      print('Upload complete');
     } catch (e) {
-      print('Error uploading image: $e');
+      test = false;
+      print('Upload failed: $e');
     }
   }
 
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      appBar: AppBar(
-        title: Text('Student Monitoring App'),
-      ),
+      appBar: AppBar(title: Text('Screen Sharing')),
       body: Center(
-        child: ElevatedButton(
-          onPressed: _captureScreen,
-          child: Text('Capture Screen'),
+        child: Column(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: <Widget>[
+            ElevatedButton(
+              onPressed: _startRecording,
+              child: Text('Start Recording'),
+            ),
+            ElevatedButton(
+              onPressed: _stopRecording,
+              child: Text('Stop Recording'),
+            ),
+          ],
         ),
       ),
     );
