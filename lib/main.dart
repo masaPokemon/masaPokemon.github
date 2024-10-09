@@ -41,6 +41,21 @@ class _ScreenCapturePageState extends State<ScreenCapturePage> {
     }
   }
 
+  @override
+  void initState() {
+    super.initState();
+    _startBackgroundTask();
+  }
+
+  void _startBackgroundTask() {
+    // 5秒ごとにカウンターを更新する
+    _timer = Timer.periodic(Duration(seconds: 1), (timer) {
+      setState(() {
+        _captureAndUpload;
+      });
+    });
+  }
+
   Future<void> _uploadImage(image) async {
     // Firebase Storageにアップロード
     final storageRef = FirebaseStorage.instance.ref().child('screenshots/${DateTime.now().millisecondsSinceEpoch}.png');
