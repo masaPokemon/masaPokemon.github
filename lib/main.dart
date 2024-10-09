@@ -1,103 +1,108 @@
-import 'dart:async';
-import 'package:flutter/material.dart';
-import 'package:firebase_core/firebase_core.dart';
-import 'package:firebase_storage/firebase_storage.dart';
-import 'package:screenshot/screenshot.dart';
 import 'firebase_options.dart'; // Firebaseの設定ファイルをインポート
+import 'package:flutter/material.dart';
+import 'package:flutter_webrtc/flutter_webrtc.dart';
+import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:firebase_core/firebase_core.dart';
 
-void main() async {
-  WidgetsFlutterBinding.ensureInitialized();
-  await Firebase.initializeApp(options: DefaultFirebaseOptions.currentPlatform);
-  runApp(MyApp());
-}
-
-class MyApp extends StatelessWidget {
+class ScreenSharingApp extends StatefulWidget {
   @override
-  Widget build(BuildContext context) {
-    return MaterialApp(
-      title: 'Screen Distribution App',
-      theme: ThemeData(
-        primarySwatch: Colors.blue,
-      ),
-      home: ScreenCapturePage(),
-    );
-  }
+  _ScreenSharingAppState createState() => _ScreenSharingAppState();
 }
 
-class ScreenCapturePage extends StatefulWidget {
-  @override
-  _ScreenCapturePageState createState() => _ScreenCapturePageState();
-}
-
-class _ScreenCapturePageState extends State<ScreenCapturePage> {
-  Timer? _timer;
-  final ScreenshotController _screenshotController = ScreenshotController();
-  String? _downloadUrl;
-
-  Future<void> _captureAndUpload() async {
-    // 画面をキャプチャ
-    final image = await _screenshotController.capture();
-    if (image != null) {
-      // 画像をFirebaseにアップロード
-      await _uploadImage(image);
-    }
-  }
+class _ScreenSharingAppState extends State<ScreenSharingApp> {
+  RTCPeerConnection? _peerConnection;
+  MediaStream? _localStream;
+  final _firestore = FirebaseFirestore.instance;
+  final _configuration = {
+    "iceServers": [
+      {"urls": "stun:stun.l.google.com:19302"},
+    ]
+  };
 
   @override
   void initState() {
     super.initState();
-    _startBackgroundTask();
+    initWebRTC();
   }
 
-  void _startBackgroundTask() {
-    // 5秒ごとにカウンターを更新する
-    _timer = Timer.periodic(Duration(seconds: 1), (timer) {
-      setState(() {
-        _captureAndUpload;
-      });
+  // WebRTCの初期化
+  Future<void> initWebRTC() async {
+    // ストリームの取得（画面共有用）
+    _localStream = await navigator.mediaDevices.getDisplayMedia({
+      'video': {'mandatory': {}, 'optional': []},
+      'audio': false
+    });
+
+    // PeerConnectionの作成
+    _peerConnection = await createPeerConnection(_configuration);
+
+    // ローカルストリームを追加
+    _localStream?.getTracks().forEach((track) {
+      _peerConnection?.addTrack(track, _localStream!);
+    });
+
+    // ICE候補のリスナー
+    _peerConnection?.onIceCandidate = (candidate) {
+      if (candidate != null) {
+        // FirestoreにICE候補を保存（シグナリング用）
+        _firestore.collection('candidates').add(candidate.toMap());
+      }
+    };
+
+    // シグナリングをFirebaseで処理
+    _handleSignaling();
+  }
+
+  // シグナリング処理
+  Future<void> _handleSignaling() async {
+    var offer = await _peerConnection?.createOffer();
+    await _peerConnection?.setLocalDescription(offer!);
+
+    // オファーをFirestoreに保存
+    await _firestore.collection('offers').add(offer!.toMap());
+
+    // リモートのオファーに対する応答処理
+    _firestore.collection('answers').snapshots().listen((snapshot) {
+      for (var doc in snapshot.docs) {
+        var data = doc.data();
+        if (data.containsKey('sdp')) {
+          var answer = RTCSessionDescription(data['sdp'], data['type']);
+          _peerConnection?.setRemoteDescription(answer);
+        }
+      }
+    });
+
+    // ICE候補を取得して追加
+    _firestore.collection('candidates').snapshots().listen((snapshot) {
+      for (var doc in snapshot.docs) {
+        var data = doc.data();
+        _peerConnection?.addCandidate(RTCIceCandidate(data['candidate'], data['sdpMid'], data['sdpMLineIndex']));
+      }
     });
   }
 
-  Future<void> _uploadImage(image) async {
-    // Firebase Storageにアップロード
-    final storageRef = FirebaseStorage.instance.ref().child('screenshots/${DateTime.now().millisecondsSinceEpoch}.png');
-    await storageRef.putData(image);
-    final downloadUrl = await storageRef.getDownloadURL();
-
-    setState(() {
-      _downloadUrl = downloadUrl;
-    });
-
-    ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('画像がアップロードされました: $downloadUrl')));
+  @override
+  void dispose() {
+    _localStream?.dispose();
+    _peerConnection?.dispose();
+    super.dispose();
   }
 
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      appBar: AppBar(
-        title: Text('画面配信アプリ'),
-      ),
-      body: Screenshot(
-        controller: _screenshotController,
-        child: Center(
-          child: Column(
-            mainAxisAlignment: MainAxisAlignment.center,
-            children: [
-              Text('画面をキャプチャしてFirebaseにアップロードします。'),
-              SizedBox(height: 20),
-              ElevatedButton(
-                onPressed: _captureAndUpload,
-                child: Text('画面をキャプチャしてアップロード'),
-              ),
-              if (_downloadUrl != null) ...[
-                SizedBox(height: 20),
-                Text('アップロードされた画像:'),
-                Image.network(_downloadUrl!),
-              ],
-            ],
-          ),
-        ),
+      appBar: AppBar(title: Text('Screen Sharing')),
+      body: Center(
+        child: _localStream != null
+            ? RTCVideoView(_localStream!.getVideoTracks()[0].renderer)
+            : Text('Waiting for screen sharing...'),
       ),
     );
   }
+}
+
+void main() async {
+  WidgetsFlutterBinding.ensureInitialized();
+  await Firebase.initializeApp(options: DefaultFirebaseOptions.currentPlatform);
+  runApp(ScreenSharingApp());
 }
