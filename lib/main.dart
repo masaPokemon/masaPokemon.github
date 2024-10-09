@@ -37,10 +37,7 @@ class _ScreenSharingPageState extends State<ScreenSharingPage> {
   Future<void> _startRecording() async {
     if (await Permission.storage.request().isGranted) {
       _filePath = (await getTemporaryDirectory()).path + "/screen_recording.mp4";
-      await FlutterScreenRecording.startRecordScreen(
-        _filePath!,
-        title: "Screen Recording",
-      );
+      await FlutterScreenRecording.startRecordScreen(_filePath!);
       setState(() {
         _isRecording = true;
       });
