@@ -69,5 +69,5 @@ class _BroadcasterAppState extends State<BroadcasterApp> {
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
   await Firebase.initializeApp(options: DefaultFirebaseOptions.currentPlatform);
-  runApp(BroadcasterScreen());
+  runApp(BroadcasterApp());
 }
