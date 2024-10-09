@@ -20,13 +20,13 @@ class _ScreenCapturePageState extends State<ScreenCapturePage> {
       final image = await screenshotController.capture();
 
       if (image != null) {
+        
         // 一時ディレクトリに保存
         final imagePath = 'screenshots/screenshot.png';
         XFile file = XFile(imagePath);
 
         // Firebase Storageにアップロード
-        Reference referenceRoot = FirebaseStorage.instance.ref("screenshots/screenshot.png").putFile(file);
-
+        Reference referenceRoot = FirebaseStorage.instance.ref('sample.png').putFile(imageFile);
         // Firebase Firestoreに画像のURLを保存
         final downloadUrl = await referenceRoot.getDownloadURL();
         await FirebaseFirestore.instance.collection('screenshots').add({
