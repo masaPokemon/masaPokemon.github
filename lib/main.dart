@@ -1,4 +1,5 @@
 import 'dart:html';
+import 'package:cross_file/cross_file.dart';
 import 'package:flutter/material.dart';
 import 'package:firebase_core/firebase_core.dart';
 import 'package:firebase_storage/firebase_storage.dart';
@@ -67,7 +68,7 @@ class _ScreenRecordingPageState extends State<ScreenRecordingPage> {
   Future<void> _uploadFile(String filePath) async {
     try {
       final reader = FileReader();
-      reader.readAsArrayBuffer(File(filePath));
+      reader.readAsArrayBuffer(XFile(filePath));
       reader.onLoadEnd.listen((event) async {
         final bytes = reader.result as Uint8List;
         final storageRef = FirebaseStorage.instance.ref().child('recordings/${DateTime.now().millisecondsSinceEpoch}.mp4');
