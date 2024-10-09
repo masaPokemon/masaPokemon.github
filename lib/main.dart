@@ -29,7 +29,7 @@ class _ProxyHistoryPageState extends State<ProxyHistoryPage> {
 
   Future<void> _fetchProxyHistory() async {
     try {
-      final response = await http.get(Uri.parse('http://YOUR_PROXY_SERVER_URL/history'));
+      final response = await http.get(Uri.parse('https://www.cc.miyazaki-u.ac.jp/internal/proxy.pac'));
       if (response.statusCode == 200) {
         setState(() {
           _history = json.decode(response.body);
