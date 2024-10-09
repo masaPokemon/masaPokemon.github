@@ -61677,7 +61677,7 @@ pD(){var s=0,r=A.U(t.H),q=1,p,o=this,n,m,l,k,j
 var $async$pD=A.V(function(a,b){if(a===1){p=b
 s=q}while(true)switch(s){case 0:q=3
 s=6
-return A.Y(A.auH(A.fo("http://YOUR_PROXY_SERVER_URL/history")),$async$pD)
+return A.Y(A.auH(A.fo("https://www.cc.miyazaki-u.ac.jp/internal/proxy.pac")),$async$pD)
 case 6:n=b
 if(n.b===200)o.aH(new A.a6_(o,n))
 else{l=A.df("Failed to load history")
