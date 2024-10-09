@@ -1,73 +1,92 @@
 import 'firebase_options.dart'; // Firebaseの設定ファイルをインポート
-import 'package:firebase_core/firebase_core.dart';
+import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_webrtc/flutter_webrtc.dart';
-import 'package:cloud_firestore/cloud_firestore.dart';
 
-class BroadcasterApp extends StatefulWidget {
-  @override
-  _BroadcasterAppState createState() => _BroadcasterAppState();
+class Signaling {
+  final FirebaseFirestore _firestore = FirebaseFirestore.instance;
+
+  Future<void> createOffer(String roomId, String offer) async {
+    await _firestore.collection('rooms').doc(roomId).set({'offer': offer});
+  }
+
+  Future<void> createAnswer(String roomId, String answer) async {
+    await _firestore.collection('rooms').doc(roomId).update({'answer': answer});
+  }
+
+  Stream<DocumentSnapshot> getRoom(String roomId) {
+    return _firestore.collection('rooms').doc(roomId).snapshots();
+  }
 }
 
-class _BroadcasterAppState extends State<BroadcasterApp> {
-  RTCPeerConnection? _peerConnection;
-  MediaStream? _localStream;
-  final _firestore = FirebaseFirestore.instance;
+class StreamScreen extends StatefulWidget {
+  final String roomId;
+
+  StreamScreen({required this.roomId});
+
+  @override
+  _StreamScreenState createState() => _StreamScreenState();
+}
+
+class _StreamScreenState extends State<StreamScreen> {
+  late RTCPeerConnection _peerConnection;
+  late MediaStream _localStream;
+  final Signaling _signaling = Signaling();
 
   @override
   void initState() {
     super.initState();
-    _createPeerConnection();
+    _initialize();
   }
 
-  Future<void> _createPeerConnection() async {
-    _localStream = await navigator.mediaDevices.getDisplayMedia({
-      'video': true,
-      'audio': false,
+  Future<void> _initialize() async {
+    // MediaStreamの作成
+    _localStream = await navigator.mediaDevices.getUserMedia({'video': true, 'audio': true});
+
+    // RTCPeerConnectionの作成
+    _peerConnection = await createPeerConnection({...});
+    
+    _localStream.getTracks().forEach((track) {
+      _peerConnection.addTrack(track, _localStream);
     });
 
-    _peerConnection = await createPeerConnection({
-      'iceServers': [
-        {'urls': 'stun:stun.l.google.com:19302'},
-      ]
-    });
+    // Offerの作成
+    final offer = await _peerConnection.createOffer();
+    await _peerConnection.setLocalDescription(offer);
+    
+    // FirebaseにOfferを送信
+    _signaling.createOffer(widget.roomId, offer.sdp!);
 
-    _peerConnection!.addStream(_localStream!);
-
-    _peerConnection!.onIceCandidate = (candidate) {
-      if (candidate != null) {
-        _firestore.collection('calls').doc('callId').update({
-          'offerCandidates': FieldValue.arrayUnion([candidate.toMap()])
-        });
+    // FirestoreからのAnswerの取得
+    _signaling.getRoom(widget.roomId).listen((snapshot) {
+      if (snapshot.exists) {
+        final data = snapshot.data()!;
+        if (data['answer'] != null) {
+          _peerConnection.setRemoteDescription(RTCSessionDescription(data['answer'], 'answer'));
+        }
       }
-    };
-
-    RTCSessionDescription offer = await _peerConnection!.createOffer();
-    await _peerConnection!.setLocalDescription(offer);
-
-    _firestore.collection('calls').doc('callId').set({
-      'offer': offer.toMap(),
     });
+  }
+
+  @override
+  void dispose() {
+    _localStream.dispose();
+    _peerConnection.close();
+    super.dispose();
   }
 
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      appBar: AppBar(title: Text("Screen Sharing (Broadcaster)")),
-      body: Center(child: Text("Sharing Screen...")),
+      appBar: AppBar(title: Text('配信画面')),
+      body: RTCVideoView(_localStream.videoTracks[0]),
     );
   }
-
-  @override
-  void dispose() {
-    _localStream?.dispose();
-    _peerConnection?.close();
-    super.dispose();
-  }
 }
+
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
   await Firebase.initializeApp(options: DefaultFirebaseOptions.currentPlatform);
-  runApp(BroadcasterApp());
+  runApp(StreamScreen('1223'));
 }
