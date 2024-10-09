@@ -1,6 +1,5 @@
 import 'package:flutter/material.dart';
 import 'package:http/http.dart' as http;
-import 'dart:convert';
 
 void main() {
   runApp(MyApp());
@@ -10,42 +9,46 @@ class MyApp extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return MaterialApp(
-      title: 'Proxy History App',
+      title: 'Proxy Info App',
       theme: ThemeData(
         primarySwatch: Colors.blue,
       ),
-      home: ProxyHistoryPage(),
+      home: ProxyInfoPage(),
     );
   }
 }
 
-class ProxyHistoryPage extends StatefulWidget {
+class ProxyInfoPage extends StatefulWidget {
   @override
-  _ProxyHistoryPageState createState() => _ProxyHistoryPageState();
+  _ProxyInfoPageState createState() => _ProxyInfoPageState();
 }
 
-class _ProxyHistoryPageState extends State<ProxyHistoryPage> {
-  List<Map<String, dynamic>> _history = [];
+class _ProxyInfoPageState extends State<ProxyInfoPage> {
+  String _proxyInfo = 'プロキシ情報を取得中...';
 
   @override
   void initState() {
     super.initState();
-    _fetchProxyHistory();
+    _fetchProxyInfo();
   }
 
-  Future<void> _fetchProxyHistory() async {
+  Future<void> _fetchProxyInfo() async {
     try {
-      // 擬似APIからデータを取得する（ここではローカルのJSONファイルなどを使うこともできます）
+      // 指定されたURLからproxy.pacファイルを取得
       final response = await http.get(Uri.parse('https://www.cc.miyazaki-u.ac.jp/internal/proxy.pac'));
       if (response.statusCode == 200) {
         setState(() {
-          _history = List<Map<String, dynamic>>.from(json.decode(response.body));
+          _proxyInfo = response.body; // 取得したPACファイルの内容を表示
         });
       } else {
-        throw Exception('データの取得に失敗しました');
+        setState(() {
+          _proxyInfo = 'データの取得に失敗しました';
+        });
       }
     } catch (e) {
-      print('エラー: $e');
+      setState(() {
+        _proxyInfo = 'エラー: $e';
+      });
     }
   }
 
@@ -53,17 +56,11 @@ class _ProxyHistoryPageState extends State<ProxyHistoryPage> {
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(
-        title: Text('プロキシ通信履歴'),
+        title: Text('プロキシ情報'),
       ),
-      body: ListView.builder(
-        itemCount: _history.length,
-        itemBuilder: (context, index) {
-          final entry = _history[index];
-          return ListTile(
-            title: Text(entry['url']),
-            subtitle: Text(entry['timestamp']),
-          );
-        },
+      body: SingleChildScrollView(
+        padding: EdgeInsets.all(16.0),
+        child: Text(_proxyInfo),
       ),
     );
   }
