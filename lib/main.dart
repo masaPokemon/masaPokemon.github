@@ -2,83 +2,79 @@ import 'firebase_options.dart'; // Firebaseの設定ファイルをインポー�
 import 'package:flutter/material.dart';
 import 'package:flutter_webrtc/flutter_webrtc.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
-import 'package:firebase_core/firebase_core.dart';
 
-class ScreenSharingApp extends StatefulWidget {
+class BroadcasterScreen extends StatefulWidget {
   @override
-  _ScreenSharingAppState createState() => _ScreenSharingAppState();
+  _BroadcasterScreenState createState() => _BroadcasterScreenState();
 }
 
-class _ScreenSharingAppState extends State<ScreenSharingApp> {
+class _BroadcasterScreenState extends State<BroadcasterScreen> {
   RTCPeerConnection? _peerConnection;
   MediaStream? _localStream;
-  final _firestore = FirebaseFirestore.instance;
-  final _configuration = {
-    "iceServers": [
-      {"urls": "stun:stun.l.google.com:19302"},
-    ]
-  };
+  final FirebaseFirestore _firestore = FirebaseFirestore.instance;
+  final _sdpController = TextEditingController();
 
   @override
   void initState() {
     super.initState();
-    initWebRTC();
+    _createPeerConnection().then((pc) {
+      _peerConnection = pc;
+      _startLocalStream();
+    });
   }
 
-  // WebRTCの初期化
-  Future<void> initWebRTC() async {
-    // ストリームの取得（画面共有用）
-    _localStream = await navigator.mediaDevices.getDisplayMedia({
-      'video': {'mandatory': {}, 'optional': []},
-      'audio': false
-    });
+  Future<void> _startLocalStream() async {
+    _localStream = await navigator.mediaDevices.getDisplayMedia({'video': true});
+    _peerConnection?.addStream(_localStream!);
+  }
 
-    // PeerConnectionの作成
-    _peerConnection = await createPeerConnection(_configuration);
+  Future<RTCPeerConnection> _createPeerConnection() async {
+    final configuration = {
+      'iceServers': [
+        {'urls': 'stun:stun.l.google.com:19302'},
+      ],
+    };
 
-    // ローカルストリームを追加
-    _localStream?.getTracks().forEach((track) {
-      _peerConnection?.addTrack(track, _localStream!);
-    });
+    final pc = await createPeerConnection(configuration);
 
-    // ICE候補のリスナー
-    _peerConnection?.onIceCandidate = (candidate) {
+    pc.onIceCandidate = (candidate) {
       if (candidate != null) {
-        // FirestoreにICE候補を保存（シグナリング用）
-        _firestore.collection('candidates').add(candidate.toMap());
+        _firestore.collection('candidates').add({
+          'candidate': candidate.toMap(),
+        });
       }
     };
 
-    // シグナリングをFirebaseで処理
-    _handleSignaling();
+    pc.onAddStream = (stream) {
+      print('Stream added: ${stream.id}');
+    };
+
+    final offer = await pc.createOffer();
+    await pc.setLocalDescription(offer);
+
+    // FirebaseにSDP情報を保存
+    _firestore.collection('offers').doc('broadcast').set({
+      'sdp': offer.sdp,
+      'type': offer.type,
+    });
+
+    return pc;
   }
 
-  // シグナリング処理
-  Future<void> _handleSignaling() async {
-    var offer = await _peerConnection?.createOffer();
-    await _peerConnection?.setLocalDescription(offer!);
-
-    // オファーをFirestoreに保存
-    await _firestore.collection('offers').add(offer!.toMap());
-
-    // リモートのオファーに対する応答処理
-    _firestore.collection('answers').snapshots().listen((snapshot) {
-      for (var doc in snapshot.docs) {
-        var data = doc.data();
-        if (data.containsKey('sdp')) {
-          var answer = RTCSessionDescription(data['sdp'], data['type']);
-          _peerConnection?.setRemoteDescription(answer);
-        }
-      }
-    });
-
-    // ICE候補を取得して追加
-    _firestore.collection('candidates').snapshots().listen((snapshot) {
-      for (var doc in snapshot.docs) {
-        var data = doc.data();
-        _peerConnection?.addCandidate(RTCIceCandidate(data['candidate'], data['sdpMid'], data['sdpMLineIndex']));
-      }
-    });
+  @override
+  Widget build(BuildContext context) {
+    return Scaffold(
+      appBar: AppBar(title: Text('Broadcaster')),
+      body: Column(
+        children: [
+          Expanded(
+            child: _localStream != null
+                ? RTCVideoView(_localStream!.getVideoTracks()[0])
+                : Center(child: Text('Starting stream...')),
+          ),
+        ],
+      ),
+    );
   }
 
   @override
@@ -87,22 +83,10 @@ class _ScreenSharingAppState extends State<ScreenSharingApp> {
     _peerConnection?.dispose();
     super.dispose();
   }
-
-  @override
-  Widget build(BuildContext context) {
-    return Scaffold(
-      appBar: AppBar(title: Text('Screen Sharing')),
-      body: Center(
-        child: _localStream != null
-            ? RTCVideoView(_localStream!.getVideoTracks()[0].renderer)
-            : Text('Waiting for screen sharing...'),
-      ),
-    );
-  }
 }
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
   await Firebase.initializeApp(options: DefaultFirebaseOptions.currentPlatform);
-  runApp(ScreenSharingApp());
+  runApp(BroadcasterScreen());
 }
