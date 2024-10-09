@@ -1,7 +1,14 @@
 import 'package:flutter/material.dart';
-import 'package:http/http.dart' as http;
+import 'package:firebase_core/firebase_core.dart';
+import 'package:firebase_storage/firebase_storage.dart';
+import 'package:flutter_screen_recording/flutter_screen_recording.dart';
+import 'package:path_provider/path_provider.dart';
+import 'dart:io';
+import 'package:permission_handler/permission_handler.dart';
 
-void main() {
+void main() async {
+  WidgetsFlutterBinding.ensureInitialized();
+  await Firebase.initializeApp();
   runApp(MyApp());
 }
 
@@ -9,46 +16,58 @@ class MyApp extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return MaterialApp(
-      title: 'Proxy Info App',
+      title: 'Screen Sharing App',
       theme: ThemeData(
         primarySwatch: Colors.blue,
       ),
-      home: ProxyInfoPage(),
+      home: ScreenSharingPage(),
     );
   }
 }
 
-class ProxyInfoPage extends StatefulWidget {
+class ScreenSharingPage extends StatefulWidget {
   @override
-  _ProxyInfoPageState createState() => _ProxyInfoPageState();
+  _ScreenSharingPageState createState() => _ScreenSharingPageState();
 }
 
-class _ProxyInfoPageState extends State<ProxyInfoPage> {
-  String _pacContent = '取得中...';
+class _ScreenSharingPageState extends State<ScreenSharingPage> {
+  bool _isRecording = false;
+  String? _filePath;
 
-  @override
-  void initState() {
-    super.initState();
-    _fetchPacFile();
+  Future<void> _startRecording() async {
+    if (await Permission.storage.request().isGranted) {
+      _filePath = (await getTemporaryDirectory()).path + "/screen_recording.mp4";
+      await FlutterScreenRecording.startRecordScreen(
+        _filePath!,
+        title: "Screen Recording",
+      );
+      setState(() {
+        _isRecording = true;
+      });
+    } else {
+      // 権限が拒否された場合の処理
+    }
   }
 
-  Future<void> _fetchPacFile() async {
-    try {
-      // PACファイルを取得
-      final response = await http.get(Uri.parse('https://www.cc.miyazaki-u.ac.jp/internal/proxy.pac'));
-      if (response.statusCode == 200) {
-        setState(() {
-          _pacContent = response.body;
-        });
-      } else {
-        setState(() {
-          _pacContent = 'PACファイルの取得に失敗しました: ${response.statusCode}';
-        });
+  Future<void> _stopRecording() async {
+    await FlutterScreenRecording.stopRecordScreen;
+    setState(() {
+      _isRecording = false;
+    });
+    await _uploadToFirebase();
+  }
+
+  Future<void> _uploadToFirebase() async {
+    if (_filePath != null) {
+      File file = File(_filePath!);
+      try {
+        await FirebaseStorage.instance.ref('recordings/${file.path.split('/').last}').putFile(file);
+        // アップロード成功時の処理
+        ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Upload Successful!')));
+      } catch (e) {
+        // エラー処理
+        print('Upload failed: $e');
       }
-    } catch (e) {
-      setState(() {
-        _pacContent = 'エラー: $e';
-      });
     }
   }
 
@@ -56,11 +75,22 @@ class _ProxyInfoPageState extends State<ProxyInfoPage> {
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(
-        title: Text('プロキシ情報'),
+        title: Text('Screen Sharing'),
       ),
-      body: SingleChildScrollView(
-        padding: EdgeInsets.all(16.0),
-        child: Text(_pacContent, style: TextStyle(fontFamily: 'Courier', fontSize: 14)),
+      body: Center(
+        child: Column(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: <Widget>[
+            ElevatedButton(
+              onPressed: _isRecording ? null : _startRecording,
+              child: Text('Start Recording'),
+            ),
+            ElevatedButton(
+              onPressed: _isRecording ? _stopRecording : null,
+              child: Text('Stop Recording'),
+            ),
+          ],
+        ),
       ),
     );
   }
