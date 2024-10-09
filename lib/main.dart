@@ -1,11 +1,12 @@
-import 'dart:html' as html;
+import 'dart:html';
 import 'package:flutter/material.dart';
 import 'package:firebase_core/firebase_core.dart';
 import 'package:firebase_storage/firebase_storage.dart';
+import 'package:flutter_screen_recording/flutter_screen_recording.dart';
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
-  await Firebase.initializeApp(); // Initialize Firebase
+  await Firebase.initializeApp();
   runApp(MyApp());
 }
 
@@ -13,7 +14,7 @@ class MyApp extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return MaterialApp(
-      title: 'Screen Recording App',
+      title: '画面録画アプリ',
       theme: ThemeData(
         primarySwatch: Colors.blue,
       ),
@@ -28,83 +29,52 @@ class ScreenRecordingPage extends StatefulWidget {
 }
 
 class _ScreenRecordingPageState extends State<ScreenRecordingPage> {
+  String? _recordingFilePath;
   bool _isRecording = false;
-  List<html.MediaStream> _mediaStreams = [];
-  late html.VideoElement _videoElement;
-  late html.MediaRecorder _mediaRecorder;
-  List<html.Blob> _recordedChunks = [];
-
-  @override
-  void initState() {
-    super.initState();
-    _videoElement = html.VideoElement();
-  }
 
   Future<void> _startRecording() async {
     try {
-      // Request screen capture
-      html.MediaStream stream = await html.window.navigator.mediaDevices.getDisplayMedia({
-        'video': true,
-        'audio': true,
-      });
-
-      _videoElement.srcObject = stream;
-      _videoElement.play();
-
-      // Create a MediaRecorder instance
-      _mediaRecorder = html.MediaRecorder(stream);
-      _mediaRecorder.onDataAvailable.listen((event) {
-        if (event.data.size > 0) {
-          _recordedChunks.add(event.data);
-        }
-      });
-
-      _mediaRecorder.onStop.listen((event) async {
-        // Create a blob from the recorded chunks
-        final blob = html.Blob(_recordedChunks, 'video/webm');
-
-        // Upload to Firebase (optional)
-        await _uploadToFirebase(blob);
-
-        // Reset the recorded chunks
-        _recordedChunks.clear();
-      });
-
-      // Start recording
-      _mediaRecorder.start();
+      // 録画を開始
+      _recordingFilePath = await FlutterScreenRecording.startRecordScreen();
       setState(() {
         _isRecording = true;
       });
     } catch (e) {
-      print('Error starting recording: $e');
+      print('録画開始エラー: $e');
     }
   }
 
   Future<void> _stopRecording() async {
-    if (_isRecording) {
-      _mediaRecorder.stop();
-      _mediaRecorder.stream.getTracks().forEach((track) => track.stop());
-      _videoElement.pause();
+    try {
+      // 録画を停止
+      String? filePath = await FlutterScreenRecording.stopRecordScreen();
       setState(() {
         _isRecording = false;
       });
+
+      // 録画したファイルをFirebaseにアップロード
+      if (filePath != null) {
+        await _uploadFile(filePath);
+      }
+    } catch (e) {
+      print('録画停止エラー: $e');
     }
   }
 
-  Future<void> _uploadToFirebase(html.Blob blob) async {
+  Future<void> _uploadFile(String filePath) async {
     try {
-      // Create a file from the blob
-      final reader = html.FileReader();
-      reader.readAsArrayBuffer(blob);
+      final reader = FileReader();
+      reader.readAsArrayBuffer(File(filePath));
       reader.onLoadEnd.listen((event) async {
-        final storageRef = FirebaseStorage.instance.ref().child('recordings/${DateTime.now().millisecondsSinceEpoch}.webm');
+        final bytes = reader.result as Uint8List;
+        final storageRef = FirebaseStorage.instance.ref().child('recordings/${DateTime.now().millisecondsSinceEpoch}.mp4');
 
-        // Upload the blob to Firebase Storage
-        await storageRef.putData(reader.result as Uint8List);
-        print('File uploaded successfully!');
+        // Firebase StorageにBlobをアップロード
+        await storageRef.putData(bytes);
+        print('ファイルがアップロードされました！');
       });
     } catch (e) {
-      print('Error uploading file: $e');
+      print('ファイルアップロードエラー: $e');
     }
   }
 
@@ -112,22 +82,23 @@ class _ScreenRecordingPageState extends State<ScreenRecordingPage> {
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(
-        title: Text('Screen Recording'),
+        title: Text('画面録画'),
       ),
       body: Center(
         child: Column(
           mainAxisAlignment: MainAxisAlignment.center,
           children: <Widget>[
-            SizedBox(
-              width: 640,
-              height: 480,
-              child: _isRecording ? Container(child: _videoElement) : Container(color: Colors.black),
+            ElevatedButton(
+              onPressed: _isRecording ? null : _startRecording,
+              child: Text('録画開始'),
+            ),
+            ElevatedButton(
+              onPressed: _isRecording ? _stopRecording : null,
+              child: Text('録画停止'),
             ),
             SizedBox(height: 20),
-            ElevatedButton(
-              onPressed: _isRecording ? _stopRecording : _startRecording,
-              child: Text(_isRecording ? 'Stop Recording' : 'Start Recording'),
-            ),
+            if (_recordingFilePath != null)
+              Text('録画ファイル: $_recordingFilePath'),
           ],
         ),
       ),
