@@ -1,146 +1,69 @@
-import 'package:flutter/foundation.dart';
+import 'dart:html' as html;
 import 'package:flutter/material.dart';
-import 'package:flutter_webrtc/flutter_webrtc.dart';
 
-void main() {
-  runApp(const MyApp());
+class ScreenRecorderApp extends StatefulWidget {
+  @override
+  _ScreenRecorderAppState createState() => _ScreenRecorderAppState();
 }
 
-class MyApp extends StatelessWidget {
-  const MyApp({super.key});
+class _ScreenRecorderAppState extends State<ScreenRecorderApp> {
+  html.MediaRecorder? _mediaRecorder;
+  List<html.Blob> _recordedChunks = [];
 
-  // This widget is the root of your application.
-  @override
-  Widget build(BuildContext context) {
-    return MaterialApp(
-      title: 'Flutter Demo',
-      theme: ThemeData(
-        primarySwatch: Colors.blue,
-      ),
-      home: const MyHomePage(title: 'Flutter Demo Home Page'),
-    );
-  }
-}
-
-class MyHomePage extends StatefulWidget {
-  const MyHomePage({super.key, required this.title});
-  final String title;
-
-  @override
-  State<MyHomePage> createState() => _MyHomePageState();
-}
-
-class _MyHomePageState extends State<MyHomePage> {
-  MediaStream? _localStream;
-  final RTCVideoRenderer _localRenderer = RTCVideoRenderer();
-  bool _isCalling = false;
-  DesktopCapturerSource? selected_source_;
-
-  @override
-  void initState() {
-    super.initState();
-    initRrenderers();
-  }
-
-  @override
-  void deactivate() {
-    super.deactivate();
-    if (_isCalling) {
-      _stop();
-    }
-    _localRenderer.dispose();
-  }
-
-  Future<void> initRrenderers() async {
-    await _localRenderer.initialize();
-  }
-
-  Future<void> selectScreenSourceDialog(BuildContext context) async {
-    await _makeCall(null);
-  }
-
-  Future<void> _makeCall(DesktopCapturerSource? source) async {
-    setState(() {
-      selected_source_ = source;
+  void _startRecording() async {
+    final stream = await html.window.navigator.mediaDevices!.getDisplayMedia({
+      'video': true,
+      'audio': true,
     });
 
-    try {
-      var stream =
-          await navigator.mediaDevices.getDisplayMedia(<String, dynamic>{
-        'video': selected_source_ == null
-            ? true
-            : {
-                'devideId': {'exact': selected_source_!.id},
-                'mandatory': {'frameRate': 30.0}
-              }
-      });
-      stream.getVideoTracks()[0].onEnded = () {
-        print(
-            'By adding a listener on onEnded you can:1) catch stop video sharing on Web');
-      };
-      _localStream = stream;
-      _localRenderer.srcObject = _localStream;
-    } catch (e) {
-      print(e.toString());
-    }
-    if (!mounted) return;
-    setState(() {
-      _isCalling = true;
-    });
-  }
-
-  Future<void> _stop() async {
-    try {
-      if (kIsWeb) {
-        _localStream?.getAudioTracks().forEach((track) => track.stop());
+    _mediaRecorder = html.MediaRecorder(stream);
+    _mediaRecorder!.onDataAvailable.listen((event) {
+      if (event.data != null) {
+        _recordedChunks.add(event.data);
       }
-      await _localStream?.dispose();
-      _localStream = null;
-      _localRenderer.srcObject = null;
-    } catch (e) {
-      print(e.toString());
-    }
+    });
+
+    _mediaRecorder!.onStop.listen((event) {
+      final blob = html.Blob(_recordedChunks);
+      final url = html.Url.createObjectUrlFromBlob(blob);
+      final a = html.AnchorElement(href: url)
+        ..setAttribute('download', 'recording.webm')
+        ..click();
+      html.Url.revokeObjectUrl(url);
+      _recordedChunks.clear();
+    });
+
+    _mediaRecorder!.start();
   }
 
-  Future<void> _hungup() async {
-    await _stop();
-    setState(() {
-      _isCalling = false;
-    });
+  void _stopRecording() {
+    _mediaRecorder?.stop();
   }
 
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      appBar: AppBar(
-        title: Text(widget.title),
-      ),
+      appBar: AppBar(title: Text("画面録画アプリ")),
       body: Center(
-        child: Container(
-          width: MediaQuery.of(context).size.width,
-          color: Colors.white10,
-          child: Stack(
-            fit: StackFit.expand,
-            children: <Widget>[
-              if (_isCalling)
-                Container(
-                  margin: const EdgeInsets.fromLTRB(0.0, 0.0, 0.0, 0.0),
-                  width: MediaQuery.of(context).size.width,
-                  height: MediaQuery.of(context).size.height,
-                  decoration: const BoxDecoration(color: Colors.black54),
-                  child: RTCVideoView(_localRenderer),
-                ),
-            ],
-          ),
+        child: Column(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            ElevatedButton(
+              onPressed: _startRecording,
+              child: Text("録画開始"),
+            ),
+            SizedBox(height: 20),
+            ElevatedButton(
+              onPressed: _stopRecording,
+              child: Text("録画停止"),
+            ),
+          ],
         ),
-      ),
-      floatingActionButton: FloatingActionButton(
-        onPressed: () {
-          _isCalling ? _hungup() : selectScreenSourceDialog(context);
-        },
-        tooltip: _isCalling ? 'hungup' : 'Call',
-        child: Icon(_isCalling ? Icons.call_end : Icons.phone),
       ),
     );
   }
+}
+
+void main() {
+  runApp(MaterialApp(home: ScreenRecorderApp()));
 }
