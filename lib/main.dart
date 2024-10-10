@@ -1,63 +1,57 @@
-import 'firebase_options.dart'; // Firebaseの設定ファイルをインポート
-import 'package:firebase_core/firebase_core.dart';
 import 'package:flutter/material.dart';
-import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter_webrtc/flutter_webrtc.dart';
 
-Future<void> main() async {
-  WidgetsFlutterBinding.ensureInitialized();
-  await Firebase.initializeApp(
-    options: DefaultFirebaseOptions.currentPlatform,
-  );
-  runApp(MaterialApp(home: ScreenShareBroadcaster()));
-}
-
-class ScreenShareBroadcaster extends StatefulWidget {
+class ScreenSharePage extends StatefulWidget {
   @override
-  _ScreenShareBroadcasterState createState() => _ScreenShareBroadcasterState();
+  _ScreenSharePageState createState() => _ScreenSharePageState();
 }
 
-class _ScreenShareBroadcasterState extends State<ScreenShareBroadcaster> {
-  final FirebaseFirestore firestore = FirebaseFirestore.instance;
-  RTCPeerConnection? _peerConnection;
-  MediaStream? _localStream;
+class _ScreenSharePageState extends State<ScreenSharePage> {
+  late RTCVideoRenderer _localRenderer;
 
   @override
   void initState() {
     super.initState();
-    _initWebRTC();
+    _localRenderer = RTCVideoRenderer();
+    _initRenderer();
   }
 
-  Future<void> _initWebRTC() async {
-    // WebRTCの設定
-    _peerConnection = await createPeerConnection({});
-    _localStream = await navigator.mediaDevices.getDisplayMedia({'video': true});
-    _localStream?.getTracks().forEach((track) {
-      _peerConnection?.addTrack(track, _localStream!);
-    });
+  Future<void> _initRenderer() async {
+    await _localRenderer.initialize();
+  }
 
-    // Offerの作成
-    RTCSessionDescription description = await _peerConnection!.createOffer();
-    await _peerConnection!.setLocalDescription(description);
-
-    // FirebaseにOfferを送信
-    await firestore.collection('screenshare').doc('room').set({
-      'offer': description.toMap(),
+  Future<void> _startScreenShare() async {
+    // 画面共有を開始するための処理
+    final mediaStream = await navigator.mediaDevices.getDisplayMedia({
+      'video': true,
     });
+    _localRenderer.srcObject = mediaStream;
+  }
+
+  @override
+  void dispose() {
+    _localRenderer.dispose();
+    super.dispose();
   }
 
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      appBar: AppBar(title: Text('Screen Share Broadcaster')),
-      body: Center(child: Text('Sharing Screen...')),
+      appBar: AppBar(title: Text("Screen Share")),
+      body: Center(
+        child: Column(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            Expanded(child: RTCVideoView(_localRenderer)),
+            ElevatedButton(
+              onPressed: _startScreenShare,
+              child: Text("画面共有を開始"),
+            ),
+          ],
+        ),
+      ),
     );
   }
-
-  @override
-  void dispose() {
-    _localStream?.dispose();
-    _peerConnection?.close();
-    super.dispose();
-  }
 }
+
+void main() => runApp(MaterialApp(home: ScreenSharePage()));
