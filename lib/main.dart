@@ -12,51 +12,61 @@ Future<void> main() async {
   runApp(Broadcaster());
 }
 
-class Broadcaster extends StatefulWidget {
+class StreamingScreen extends StatefulWidget {
   @override
-  _BroadcasterState createState() => _BroadcasterState();
+  _StreamingScreenState createState() => _StreamingScreenState();
 }
 
-class _BroadcasterState extends State<Broadcaster> {
-  final FirebaseFirestore _firestore = FirebaseFirestore.instance;
-
+class _StreamingScreenState extends State<StreamingScreen> {
+  final _localRenderer = RTCVideoRenderer();
+  final _remoteRenderer = RTCVideoRenderer();
   late RTCPeerConnection _peerConnection;
-  late MediaStream _localStream;
+  final _firestore = FirebaseFirestore.instance;
 
   @override
   void initState() {
     super.initState();
+    _initRenderers();
     _createPeerConnection();
   }
 
-  Future<void> _createPeerConnection() async {
-    // WebRTCの設定を行う
-    final Map<String, dynamic> configuration = {
-      'iceServers': [
-        {'urls': 'stun:stun.l.google.com:19302'},
-      ],
-    };
-    _peerConnection = await createPeerConnection(configuration);
-
-    // ローカルメディアストリームを作成
-    _localStream = await _getUserMedia();
-    _peerConnection.addStream(_localStream);
-
-    // Firebaseにシグナリング情報を保存
-    await _firestore.collection('broadcasters').add({
-      'offer': await _peerConnection.createOffer(),
-    });
+  Future<void> _initRenderers() async {
+    await _localRenderer.initialize();
+    await _remoteRenderer.initialize();
   }
 
-  Future<MediaStream> _getUserMedia() async {
-    final stream = await navigator.mediaDevices.getDisplayMedia({'video': true});
-    return stream;
+  Future<void> _createPeerConnection() async {
+    final config = {
+      'iceServers': [
+        {'url': 'stun:stun.l.google.com:19302'},
+      ]
+    };
+
+    _peerConnection = await createPeerConnection(config);
+    _peerConnection.onIceCandidate = (candidate) {
+      _firestore.collection('calls').doc('your-call-id').update({
+        'candidate': candidate.toMap(),
+      });
+    };
+
+    _peerConnection.onAddStream = (stream) {
+      _remoteRenderer.srcObject = stream;
+    };
+
+    // スクリーンをキャプチャ
+    MediaStream stream = await navigator.mediaDevices.getDisplayMedia({
+      'video': true,
+      'audio': true,
+    });
+    _localRenderer.srcObject = stream;
+    _peerConnection.addStream(stream);
   }
 
   @override
   void dispose() {
-    _localStream.dispose();
-    _peerConnection.dispose();
+    _localRenderer.dispose();
+    _remoteRenderer.dispose();
+    _peerConnection.close();
     super.dispose();
   }
 
@@ -64,10 +74,15 @@ class _BroadcasterState extends State<Broadcaster> {
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(
-        title: Text('Broadcaster'),
+        title: Text("Screen Sharing - Streamer"),
       ),
       body: Center(
-        child: Text('Screen Sharing in Progress'),
+        child: Column(
+          children: [
+            Expanded(child: RTCVideoView(_localRenderer)),
+            Expanded(child: RTCVideoView(_remoteRenderer)),
+          ],
+        ),
       ),
     );
   }
