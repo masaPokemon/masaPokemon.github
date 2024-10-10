@@ -1,78 +1,62 @@
 import 'firebase_options.dart'; // Firebaseの設定ファイルをインポート
 
 import 'package:flutter/material.dart';
-import 'package:flutter_webrtc/flutter_webrtc.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:flutter/material.dart';
+import 'BroadcastScreen.dart';
+import 'ViewScreen.dart';
 
-class Broadcaster extends StatefulWidget {
-  @override
-  _BroadcasterState createState() => _BroadcasterState();
+Future<void> main() async {
+  WidgetsFlutterBinding.ensureInitialized();
+  await Firebase.initializeApp(
+    options: DefaultFirebaseOptions.currentPlatform,
+  );
+  runApp(MyApp());
 }
 
-class _BroadcasterState extends State<Broadcaster> {
-  RTCPeerConnection? _peerConnection;
-  MediaStream? _localStream;
-  final FirebaseFirestore _firestore = FirebaseFirestore.instance;
-
+class MyApp extends StatelessWidget {
   @override
-  void initState() {
-    super.initState();
-    _createPeerConnection().then((pc) {
-      _peerConnection = pc;
-      _startLocalStream();
-    });
+  Widget build(BuildContext context) {
+    return MaterialApp(
+      title: 'Flutter WebRTC',
+      home: HomeScreen(),
+    );
   }
+}
 
-  Future<void> _startLocalStream() async {
-    _localStream = await navigator.mediaDevices.getDisplayMedia({
-      'video': true,
-      'audio': false,
-    });
-    _peerConnection?.addStream(_localStream!);
-  }
-
-  Future<RTCPeerConnection> _createPeerConnection() async {
-    final config = {
-      'iceServers': [
-        {'urls': 'stun:stun.l.google.com:19302'}
-      ]
-    };
-    final pc = await createPeerConnection(config);
-    pc.onIceCandidate = (candidate) {
-      _firestore.collection('candidates').add(candidate.toMap());
-    };
-
-    final offer = await pc.createOffer();
-    await pc.setLocalDescription(offer);
-    _firestore.collection('offers').doc('broadcaster').set(offer.toMap());
-
-    return pc;
-  }
+class HomeScreen extends StatelessWidget {
+  final TextEditingController _roomIdController = TextEditingController();
 
   @override
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(
-        title: Text('Broadcaster'),
+        title: Text('WebRTC Screen Share'),
       ),
-      body: Center(
-        child: _localStream != null
-            ? RTCVideoView(_localStream!.getVideoTracks()[0].renderers[0])
-            : CircularProgressIndicator(),
+      body: Column(
+        children: [
+          TextField(
+            controller: _roomIdController,
+            decoration: InputDecoration(labelText: "Enter Room ID"),
+          ),
+          ElevatedButton(
+            onPressed: () {
+              Navigator.of(context).push(
+                MaterialPageRoute(builder: (_) => BroadcastScreen(_roomIdController.text)),
+              );
+            },
+            child: Text("Start Broadcasting"),
+          ),
+          ElevatedButton(
+            onPressed: () {
+              Navigator.of(context).push(
+                MaterialPageRoute(builder: (_) => ViewScreen(_roomIdController.text)),
+              );
+            },
+            child: Text("View Broadcast"),
+          ),
+        ],
       ),
     );
   }
-
-  @override
-  void dispose() {
-    _localStream?.dispose();
-    _peerConnection?.close();
-    super.dispose();
-  }
-}
-
-void main() async {
-  WidgetsFlutterBinding.ensureInitialized();
-  await Firebase.initializeApp(options: DefaultFirebaseOptions.currentPlatform);
-  runApp(Broadcaster());
 }
