@@ -14,7 +14,7 @@ class MyApp extends StatelessWidget {
   DateTime tomorrow = DateTime(10, 11, 1);
   @override
   Widget build(BuildContext context) {
-    if (now.isBefore(tomorrow)) {
+    if (now.isAfter(tomorrow)) {
       return MaterialApp(
         title: 'アンケートアプリ',
         home: SurveyPage(),
