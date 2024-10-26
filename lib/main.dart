@@ -79,6 +79,7 @@ class _SurveyPageState extends State<SurveyPage> {
     );
   }
 }
+
 class SeatOptimizationPage extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
@@ -94,7 +95,7 @@ class SeatOptimizationPage extends StatelessWidget {
           List<Widget> seats = _optimizeSeats(snapshot.data!.docs);
 
           return GridView.count(
-            crossAxisCount: 3,
+            crossAxisCount: 6, // 6x6の机の配置
             children: seats,
           );
         },
@@ -103,28 +104,88 @@ class SeatOptimizationPage extends StatelessWidget {
   }
 
   List<Widget> _optimizeSeats(List<QueryDocumentSnapshot> documents) {
-    // 生徒の好みを考慮して席替えを最適化
+    // 生徒の名前と好みを保持するマップ
     Map<String, List<String>> preferences = {};
+
+    // データを取得して好みをマップに保存
     for (var doc in documents) {
       String name = doc['name'];
       String preference = doc['preference'];
-      preferences[name] = _evaluatePreference(preference);
+      preferences[name] = preference.split(','); // 好みをカンマで分割してリストに
     }
 
-    // 各生徒の評価値を基に最適な席を決定（ここでは単純にランダム化しているが、評価に基づくロジックを入れることができる）
-    List<String> sortedNames = preferences.keys.toList();
-    sortedNames.sort((a, b) => preferences[b]!.length.compareTo(preferences[a]!.length));
-
-    return sortedNames.map((name) {
-      return Card(
-        child: Center(child: Text(name)),
-      );
+    List<Student> students = preferences.entries.map((entry) {
+      return Student(name: entry.key, preferences: entry.value);
     }).toList();
-  }
 
-  List<String> _evaluatePreference(String preference) {
-    // 好みに基づく評価値を計算
-    // ここでは単純なロジックとして、カンマ区切りの文字列を返す
-    return preference.split(',').map((p) => p.trim()).toList();
+    // 席の配置を最適化するロジック
+    List<List<Student?>> seatingArrangement = List.generate(6, (_) => List.filled(6, null));
+
+    // 生徒をランダムに並べる
+    students.shuffle();
+
+    for (Student student in students) {
+      bool seated = false;
+
+      // 好みの生徒が近くにいる場合、そこに座らせる
+      for (String preference in student.preferences) {
+        // 好みの生徒を探す
+        for (int row = 0; row < 6; row++) {
+          for (int col = 0; col < 6; col++) {
+            if (seatingArrangement[row][col]?.name == preference) {
+              // 好みの生徒が見つかった場合、近くの席に配置
+              for (var delta in [
+                [0, 1], [0, -1], [1, 0], [-1, 0] // 右、左、下、上
+              ]) {
+                int newRow = row + delta[0];
+                int newCol = col + delta[1];
+                if (newRow >= 0 && newRow < 6 && newCol >= 0 && newCol < 6 && seatingArrangement[newRow][newCol] == null) {
+                  seatingArrangement[newRow][newCol] = student;
+                  seated = true;
+                  break;
+                }
+              }
+              break;
+            }
+          }
+          if (seated) break;
+        }
+
+        // 座れなかった場合、空いている席に座らせる
+        if (!seated) {
+          for (int row = 0; row < 6; row++) {
+            for (int col = 0; col < 6; col++) {
+              if (seatingArrangement[row][col] == null) {
+                seatingArrangement[row][col] = student;
+                seated = true;
+                break;
+              }
+            }
+            if (seated) break;
+          }
+        }
+
+        if (seated) break; // 好みの生徒の近くに座ったらループを抜ける
+      }
+    }
+
+    // 6x6の座席をCardウィジェットとして表示
+    List<Widget> seatWidgets = [];
+    for (var row in seatingArrangement) {
+      for (var student in row) {
+        seatWidgets.add(Card(
+          child: Center(child: Text(student?.name ?? '')),
+        ));
+      }
+    }
+
+    return seatWidgets;
   }
+}
+
+class Student {
+  final String name;
+  final List<String> preferences;
+
+  Student({required this.name, required this.preferences});
 }
