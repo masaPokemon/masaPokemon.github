@@ -41,48 +41,48 @@ class DefaultFirebaseOptions {
   }
 
   static const FirebaseOptions web = FirebaseOptions(
-    apiKey: "AIzaSyCk8-GzoRyKMEp32X-zf8FNx1hNoOc56CE",
-    authDomain: "lets-go-to-school-server.firebaseapp.com",
-    projectId: "lets-go-to-school-server",
-    storageBucket: "lets-go-to-school-server.appspot.com",
-    messagingSenderId: "149825716219",
-    appId: "1:149825716219:web:ef2c1e3b169efc5629155e",
-    measurementId: "G-8WN948RYY3"
+    apiKey: 'AIzaSyD_ddEwE9Cy9rvh7Rdf5ddVBAY8aEKj9cM',
+    appId: '1:416064751674:web:a2808bdfffe75a012ccd03',
+    messagingSenderId: '416064751674',
+    projectId: 'seat-change-optimization',
+    authDomain: 'seat-change-optimization.firebaseapp.com',
+    storageBucket: 'seat-change-optimization.appspot.com',
+    measurementId: 'G-Q6TSN9L1TN',
   );
 
   static const FirebaseOptions android = FirebaseOptions(
-    apiKey: 'AIzaSyCFtvU2nkOl8hR6lp6T31rZYzfMn2KH53o',
-    appId: '1:1044636784507:android:fc879f408454aa556dcfde',
-    messagingSenderId: '1044636784507',
-    projectId: 'masa-chat-sechack365-2024',
-    storageBucket: 'masa-chat-sechack365-2024.appspot.com',
+    apiKey: 'AIzaSyBGq78MrrPMzcFarzt4wow7__4HMv6BGpw',
+    appId: '1:416064751674:android:65e7060f4bf439582ccd03',
+    messagingSenderId: '416064751674',
+    projectId: 'seat-change-optimization',
+    storageBucket: 'seat-change-optimization.appspot.com',
   );
 
   static const FirebaseOptions ios = FirebaseOptions(
-    apiKey: 'AIzaSyCmnRMNLCetApF-Q1a1XRbBjROT3gwcPQg',
-    appId: '1:1044636784507:ios:8e3081cd99ea9e136dcfde',
-    messagingSenderId: '1044636784507',
-    projectId: 'masa-chat-sechack365-2024',
-    storageBucket: 'masa-chat-sechack365-2024.appspot.com',
-    iosBundleId: 'com.example.masaChatFirebase',
+    apiKey: 'AIzaSyD97Kzbdpf7LeG4TGxcthdTsP0GkktOz0w',
+    appId: '1:416064751674:ios:e711b474581b570a2ccd03',
+    messagingSenderId: '416064751674',
+    projectId: 'seat-change-optimization',
+    storageBucket: 'seat-change-optimization.appspot.com',
+    iosBundleId: 'com.example.seatChangeOptimization',
   );
 
   static const FirebaseOptions macos = FirebaseOptions(
-    apiKey: 'AIzaSyCmnRMNLCetApF-Q1a1XRbBjROT3gwcPQg',
-    appId: '1:1044636784507:ios:8e3081cd99ea9e136dcfde',
-    messagingSenderId: '1044636784507',
-    projectId: 'masa-chat-sechack365-2024',
-    storageBucket: 'masa-chat-sechack365-2024.appspot.com',
-    iosBundleId: 'com.example.masaChatFirebase',
+    apiKey: 'AIzaSyD97Kzbdpf7LeG4TGxcthdTsP0GkktOz0w',
+    appId: '1:416064751674:ios:e711b474581b570a2ccd03',
+    messagingSenderId: '416064751674',
+    projectId: 'seat-change-optimization',
+    storageBucket: 'seat-change-optimization.appspot.com',
+    iosBundleId: 'com.example.seatChangeOptimization',
   );
 
   static const FirebaseOptions windows = FirebaseOptions(
-    apiKey: 'AIzaSyAcKl7XGXj3hn0jw_CPdeSK3NNtUDLgyL8',
-    appId: '1:1044636784507:web:2cf7324d64a8db616dcfde',
-    messagingSenderId: '1044636784507',
-    projectId: 'masa-chat-sechack365-2024',
-    authDomain: 'masa-chat-sechack365-2024.firebaseapp.com',
-    storageBucket: 'masa-chat-sechack365-2024.appspot.com',
-    measurementId: 'G-03CV0XKZ5Y',
+    apiKey: 'AIzaSyD_ddEwE9Cy9rvh7Rdf5ddVBAY8aEKj9cM',
+    appId: '1:416064751674:web:27e8673e8034bed82ccd03',
+    messagingSenderId: '416064751674',
+    projectId: 'seat-change-optimization',
+    authDomain: 'seat-change-optimization.firebaseapp.com',
+    storageBucket: 'seat-change-optimization.appspot.com',
+    measurementId: 'G-NCKKW7774G',
   );
 }
