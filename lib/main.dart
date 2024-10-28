@@ -66,7 +66,7 @@ class _SurveyPageState extends State<SurveyPage> {
             ),
             TextField(
               controller: _preferenceController,
-              decoration: InputDecoration(labelText: '好みの人'),
+              decoration: InputDecoration(labelText: '好みの人（カンマ区切り）'),
             ),
             SizedBox(height: 20),
             ElevatedButton(
