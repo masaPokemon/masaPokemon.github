@@ -14,6 +14,7 @@ class MyApp extends StatelessWidget {
   Widget build(BuildContext context) {
     return MaterialApp(
       title: '席替え最適化アプリ',
+      theme: ThemeData(primarySwatch: Colors.blue),
       home: SurveyPage(),
     );
   }
@@ -27,22 +28,26 @@ class SurveyPage extends StatefulWidget {
 class _SurveyPageState extends State<SurveyPage> {
   final TextEditingController _nameController = TextEditingController();
   final TextEditingController _preferenceController = TextEditingController();
+  final TextEditingController _satisfactionController = TextEditingController();
 
-  void _submitSurvey() async {
+  Future<void> _submitSurvey() async {
     String name = _nameController.text.trim();
     String preference = _preferenceController.text.trim();
+    String satisfaction = _satisfactionController.text.trim();
 
-    if (name.isNotEmpty && preference.isNotEmpty) {
+    if (name.isNotEmpty && preference.isNotEmpty && satisfaction.isNotEmpty) {
       try {
         await FirebaseFirestore.instance.collection('surveys').add({
           'name': name,
-          'preference': preference,
+          'preference': preference.split(',').map((s) => s.trim()).toList(),
+          'satisfaction': int.parse(satisfaction),
         });
         _nameController.clear();
         _preferenceController.clear();
+        _satisfactionController.clear();
         ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('アンケートを送信しました')));
       } catch (e) {
-        ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('エラーが発生しました')));
+        ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('送信中にエラーが発生しました')));
       }
     } else {
       ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('すべてのフィールドを入力してください')));
@@ -64,6 +69,11 @@ class _SurveyPageState extends State<SurveyPage> {
             TextField(
               controller: _preferenceController,
               decoration: InputDecoration(labelText: '好みの人（カンマ区切り）'),
+            ),
+            TextField(
+              controller: _satisfactionController,
+              decoration: InputDecoration(labelText: '満足度ポイント（1-10）'),
+              keyboardType: TextInputType.number,
             ),
             SizedBox(height: 20),
             ElevatedButton(
@@ -100,7 +110,7 @@ class SeatOptimizationPage extends StatelessWidget {
             return Center(child: Text('データがありません'));
           }
 
-          List<Widget> seats = _generateSeatingArrangement(snapshot.data!.docs);
+          List<Widget> seats = _createSeatingArrangement(snapshot.data!.docs);
 
           return GridView.count(
             crossAxisCount: 6,
@@ -111,29 +121,23 @@ class SeatOptimizationPage extends StatelessWidget {
     );
   }
 
-  List<Widget> _generateSeatingArrangement(List<QueryDocumentSnapshot> documents) {
-    Map<String, List<String>> preferences = {};
-
-    for (var doc in documents) {
-      String name = doc['name'];
-      String preference = doc['preference'];
-      preferences[name] = preference.split(',').map((s) => s.trim()).toList();
-    }
-
-    List<Student> students = preferences.entries.map((entry) {
-      return Student(name: entry.key, preferences: entry.value);
+  List<Widget> _createSeatingArrangement(List<QueryDocumentSnapshot> documents) {
+    List<Student> students = documents.map((doc) {
+      return Student(
+        name: doc['name'],
+        preferences: List<String>.from(doc['preference']),
+        satisfaction: doc['satisfaction'],
+      );
     }).toList();
 
-    // 学生をランダムにシャッフル
-    //students.shuffle();
+    // 満足度ポイントでソート
+    students.sort((a, b) => b.satisfaction.compareTo(a.satisfaction));
 
+    // 席配置の初期化
     List<List<Student?>> seatingArrangement = List.generate(6, (_) => List.filled(6, null));
 
     for (Student student in students) {
-      bool placed = _placeStudent(student, seatingArrangement);
-      if (!placed) {
-        _findEmptySeat(student, seatingArrangement);
-      }
+      _placeStudentInSeat(student, seatingArrangement);
     }
 
     return seatingArrangement.expand((row) {
@@ -145,24 +149,31 @@ class SeatOptimizationPage extends StatelessWidget {
     }).toList();
   }
 
-  bool _placeStudent(Student student, List<List<Student?>> seatingArrangement) {
+  void _placeStudentInSeat(Student student, List<List<Student?>> seatingArrangement) {
     for (String preference in student.preferences) {
       for (int row = 0; row < 6; row++) {
         for (int col = 0; col < 6; col++) {
           if (seatingArrangement[row][col]?.name == preference) {
-            for (var delta in [[0, 1], [0, -1], [1, 0], [-1, 0]]) {
-              int newRow = row + delta[0];
-              int newCol = col + delta[1];
-              if (_isValidSeat(newRow, newCol, seatingArrangement)) {
-                seatingArrangement[newRow][newCol] = student;
-                return true;
-              }
-            }
+            _tryToPlaceAdjacent(student, seatingArrangement, row, col);
+            return;
           }
         }
       }
     }
-    return false;
+
+    // 好みの席が見つからなかった場合は空いている席に座らせる
+    _findEmptySeat(student, seatingArrangement);
+  }
+
+  void _tryToPlaceAdjacent(Student student, List<List<Student?>> seatingArrangement, int row, int col) {
+    for (var delta in [[0, 1], [0, -1], [1, 0], [-1, 0]]) {
+      int newRow = row + delta[0];
+      int newCol = col + delta[1];
+      if (_isValidSeat(newRow, newCol, seatingArrangement)) {
+        seatingArrangement[newRow][newCol] = student;
+        return;
+      }
+    }
   }
 
   void _findEmptySeat(Student student, List<List<Student?>> seatingArrangement) {
@@ -184,6 +195,7 @@ class SeatOptimizationPage extends StatelessWidget {
 class Student {
   final String name;
   final List<String> preferences;
+  final int satisfaction;
 
-  Student({required this.name, required this.preferences});
+  Student({required this.name, required this.preferences, required this.satisfaction});
 }
