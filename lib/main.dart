@@ -10,14 +10,11 @@ void main() async {
 }
 
 class MyApp extends StatelessWidget {
-  DateTime now = DateTime.now();
-  DateTime tomorrow = DateTime(2024, 11, 1); // 正しい日付
-
   @override
   Widget build(BuildContext context) {
     return MaterialApp(
-      title: now.isAfter(tomorrow) ? 'アンケートアプリ' : '席替え結果',
-      home: now.isAfter(tomorrow) ? SurveyPage() : SeatOptimizationPage(),
+      title: '席替え最適化アプリ',
+      home: SurveyPage(),
     );
   }
 }
@@ -32,8 +29,8 @@ class _SurveyPageState extends State<SurveyPage> {
   final TextEditingController _preferenceController = TextEditingController();
 
   void _submitSurvey() async {
-    String name = _nameController.text;
-    String preference = _preferenceController.text;
+    String name = _nameController.text.trim();
+    String preference = _preferenceController.text.trim();
 
     if (name.isNotEmpty && preference.isNotEmpty) {
       try {
@@ -45,7 +42,7 @@ class _SurveyPageState extends State<SurveyPage> {
         _preferenceController.clear();
         ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('アンケートを送信しました')));
       } catch (e) {
-        ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('送信中にエラーが発生しました')));
+        ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('エラーが発生しました')));
       }
     } else {
       ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('すべてのフィールドを入力してください')));
@@ -73,6 +70,13 @@ class _SurveyPageState extends State<SurveyPage> {
               onPressed: _submitSurvey,
               child: Text('送信'),
             ),
+            SizedBox(height: 20),
+            ElevatedButton(
+              onPressed: () {
+                Navigator.push(context, MaterialPageRoute(builder: (context) => SeatOptimizationPage()));
+              },
+              child: Text('席替え結果を表示'),
+            ),
           ],
         ),
       ),
@@ -84,7 +88,7 @@ class SeatOptimizationPage extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      appBar: AppBar(title: Text('席替え最適化')),
+      appBar: AppBar(title: Text('席替え結果')),
       body: StreamBuilder<QuerySnapshot>(
         stream: FirebaseFirestore.instance.collection('surveys').snapshots(),
         builder: (context, snapshot) {
@@ -96,7 +100,7 @@ class SeatOptimizationPage extends StatelessWidget {
             return Center(child: Text('データがありません'));
           }
 
-          List<Widget> seats = _optimizeSeats(snapshot.data!.docs);
+          List<Widget> seats = _generateSeatingArrangement(snapshot.data!.docs);
 
           return GridView.count(
             crossAxisCount: 6,
@@ -107,74 +111,73 @@ class SeatOptimizationPage extends StatelessWidget {
     );
   }
 
-  List<Widget> _optimizeSeats(List<QueryDocumentSnapshot> documents) {
+  List<Widget> _generateSeatingArrangement(List<QueryDocumentSnapshot> documents) {
     Map<String, List<String>> preferences = {};
 
     for (var doc in documents) {
       String name = doc['name'];
       String preference = doc['preference'];
-      preferences[name] = preference.split(','); // 好みをカンマで分割
+      preferences[name] = preference.split(',').map((s) => s.trim()).toList();
     }
 
     List<Student> students = preferences.entries.map((entry) {
       return Student(name: entry.key, preferences: entry.value);
     }).toList();
 
+    // 学生をランダムにシャッフル
+    //students.shuffle();
+
     List<List<Student?>> seatingArrangement = List.generate(6, (_) => List.filled(6, null));
 
-    students.shuffle();
-
     for (Student student in students) {
-      bool seated = false;
-
-      for (String preference in student.preferences) {
-        for (int row = 0; row < 6; row++) {
-          for (int col = 0; col < 6; col++) {
-            if (seatingArrangement[row][col]?.name == preference) {
-              for (var delta in [
-                [0, 1], [0, -1], [1, 0], [-1, 0]
-              ]) {
-                int newRow = row + delta[0];
-                int newCol = col + delta[1];
-                if (newRow >= 0 && newRow < 6 && newCol >= 0 && newCol < 6 && seatingArrangement[newRow][newCol] == null) {
-                  seatingArrangement[newRow][newCol] = student;
-                  seated = true;
-                  break;
-                }
-              }
-              break;
-            }
-          }
-          if (seated) break;
-        }
-
-        if (!seated) {
-          for (int row = 0; row < 6; row++) {
-            for (int col = 0; col < 6; col++) {
-              if (seatingArrangement[row][col] == null) {
-                seatingArrangement[row][col] = student;
-                seated = true;
-                break;
-              }
-            }
-            if (seated) break;
-          }
-        }
-
-        if (seated) break;
+      bool placed = _placeStudent(student, seatingArrangement);
+      if (!placed) {
+        _findEmptySeat(student, seatingArrangement);
       }
     }
 
-    List<Widget> seatWidgets = [];
-    for (var row in seatingArrangement) {
-      for (var student in row) {
-        seatWidgets.add(Card(
+    return seatingArrangement.expand((row) {
+      return row.map((student) {
+        return Card(
           child: Center(child: Text(student?.name ?? '')),
-        ));
+        );
+      });
+    }).toList();
+  }
+
+  bool _placeStudent(Student student, List<List<Student?>> seatingArrangement) {
+    for (String preference in student.preferences) {
+      for (int row = 0; row < 6; row++) {
+        for (int col = 0; col < 6; col++) {
+          if (seatingArrangement[row][col]?.name == preference) {
+            for (var delta in [[0, 1], [0, -1], [1, 0], [-1, 0]]) {
+              int newRow = row + delta[0];
+              int newCol = col + delta[1];
+              if (_isValidSeat(newRow, newCol, seatingArrangement)) {
+                seatingArrangement[newRow][newCol] = student;
+                return true;
+              }
+            }
+          }
+        }
       }
     }
+    return false;
+  }
 
-    return seatWidgets;
+  void _findEmptySeat(Student student, List<List<Student?>> seatingArrangement) {
+    for (int row = 0; row < 6; row++) {
+      for (int col = 0; col < 6; col++) {
+        if (seatingArrangement[row][col] == null) {
+          seatingArrangement[row][col] = student;
+          return;
+        }
+      }
+    }
+  }
+
+  bool _isValidSeat(int row, int col, List<List<Student?>> seatingArrangement) {
+    return row >= 0 && row < 6 && col >= 0 && col < 6 && seatingArrangement[row][col] == null;
   }
 }
 
