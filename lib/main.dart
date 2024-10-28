@@ -5,26 +5,20 @@ import 'firebase_options.dart';
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
-  await Firebase.initializeApp(options: DefaultFirebaseOptions.currentPlatform,);
+  await Firebase.initializeApp(options: DefaultFirebaseOptions.currentPlatform);
   runApp(MyApp());
 }
 
 class MyApp extends StatelessWidget {
   DateTime now = DateTime.now();
-  DateTime tomorrow = DateTime(10, 11, 1);
+  DateTime tomorrow = DateTime(2024, 11, 1); // 正しい日付
+
   @override
   Widget build(BuildContext context) {
-    if (now.isAfter(tomorrow)) {
-      return MaterialApp(
-        title: 'アンケートアプリ',
-        home: SurveyPage(),
-      );
-    } else {
-      return MaterialApp(
-        title: '席替え結果',
-        home: SeatOptimizationPage(),
-      );
-    }
+    return MaterialApp(
+      title: now.isAfter(tomorrow) ? 'アンケートアプリ' : '席替え結果',
+      home: now.isAfter(tomorrow) ? SurveyPage() : SeatOptimizationPage(),
+    );
   }
 }
 
@@ -42,13 +36,19 @@ class _SurveyPageState extends State<SurveyPage> {
     String preference = _preferenceController.text;
 
     if (name.isNotEmpty && preference.isNotEmpty) {
-      await FirebaseFirestore.instance.collection('surveys').add({
-        'name': name,
-        'preference': preference,
-      });
-      _nameController.clear();
-      _preferenceController.clear();
-      ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('アンケートを送信しました')));
+      try {
+        await FirebaseFirestore.instance.collection('surveys').add({
+          'name': name,
+          'preference': preference,
+        });
+        _nameController.clear();
+        _preferenceController.clear();
+        ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('アンケートを送信しました')));
+      } catch (e) {
+        ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('送信中にエラーが発生しました')));
+      }
+    } else {
+      ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('すべてのフィールドを入力してください')));
     }
   }
 
@@ -85,17 +85,21 @@ class SeatOptimizationPage extends StatelessWidget {
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(title: Text('席替え最適化')),
-      body: FutureBuilder<QuerySnapshot>(
-        future: FirebaseFirestore.instance.collection('surveys').get(),
+      body: StreamBuilder<QuerySnapshot>(
+        stream: FirebaseFirestore.instance.collection('surveys').snapshots(),
         builder: (context, snapshot) {
           if (snapshot.connectionState == ConnectionState.waiting) {
             return Center(child: CircularProgressIndicator());
           }
 
+          if (!snapshot.hasData || snapshot.data!.docs.isEmpty) {
+            return Center(child: Text('データがありません'));
+          }
+
           List<Widget> seats = _optimizeSeats(snapshot.data!.docs);
 
           return GridView.count(
-            crossAxisCount: 6, // 6x6の机の配置
+            crossAxisCount: 6,
             children: seats,
           );
         },
@@ -104,38 +108,31 @@ class SeatOptimizationPage extends StatelessWidget {
   }
 
   List<Widget> _optimizeSeats(List<QueryDocumentSnapshot> documents) {
-    // 生徒の名前と好みを保持するマップ
     Map<String, List<String>> preferences = {};
 
-    // データを取得して好みをマップに保存
     for (var doc in documents) {
       String name = doc['name'];
       String preference = doc['preference'];
-      preferences[name] = preference.split(','); // 好みをカンマで分割してリストに
+      preferences[name] = preference.split(','); // 好みをカンマで分割
     }
 
     List<Student> students = preferences.entries.map((entry) {
       return Student(name: entry.key, preferences: entry.value);
     }).toList();
 
-    // 席の配置を最適化するロジック
     List<List<Student?>> seatingArrangement = List.generate(6, (_) => List.filled(6, null));
 
-    // 生徒をランダムに並べる
     students.shuffle();
 
     for (Student student in students) {
       bool seated = false;
 
-      // 好みの生徒が近くにいる場合、そこに座らせる
       for (String preference in student.preferences) {
-        // 好みの生徒を探す
         for (int row = 0; row < 6; row++) {
           for (int col = 0; col < 6; col++) {
             if (seatingArrangement[row][col]?.name == preference) {
-              // 好みの生徒が見つかった場合、近くの席に配置
               for (var delta in [
-                [0, 1], [0, -1], [1, 0], [-1, 0] // 右、左、下、上
+                [0, 1], [0, -1], [1, 0], [-1, 0]
               ]) {
                 int newRow = row + delta[0];
                 int newCol = col + delta[1];
@@ -151,7 +148,6 @@ class SeatOptimizationPage extends StatelessWidget {
           if (seated) break;
         }
 
-        // 座れなかった場合、空いている席に座らせる
         if (!seated) {
           for (int row = 0; row < 6; row++) {
             for (int col = 0; col < 6; col++) {
@@ -165,11 +161,10 @@ class SeatOptimizationPage extends StatelessWidget {
           }
         }
 
-        if (seated) break; // 好みの生徒の近くに座ったらループを抜ける
+        if (seated) break;
       }
     }
 
-    // 6x6の座席をCardウィジェットとして表示
     List<Widget> seatWidgets = [];
     for (var row in seatingArrangement) {
       for (var student in row) {
