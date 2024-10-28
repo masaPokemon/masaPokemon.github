@@ -28,23 +28,19 @@ class SurveyPage extends StatefulWidget {
 class _SurveyPageState extends State<SurveyPage> {
   final TextEditingController _nameController = TextEditingController();
   final TextEditingController _preferenceController = TextEditingController();
-  final TextEditingController _satisfactionController = TextEditingController();
 
   Future<void> _submitSurvey() async {
     String name = _nameController.text.trim();
     String preference = _preferenceController.text.trim();
-    String satisfaction = _satisfactionController.text.trim();
 
-    if (name.isNotEmpty && preference.isNotEmpty && satisfaction.isNotEmpty) {
+    if (name.isNotEmpty && preference.isNotEmpty) {
       try {
         await FirebaseFirestore.instance.collection('surveys').add({
           'name': name,
           'preference': preference.split(',').map((s) => s.trim()).toList(),
-          'satisfaction': int.parse(satisfaction),
         });
         _nameController.clear();
         _preferenceController.clear();
-        _satisfactionController.clear();
         ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('アンケートを送信しました')));
       } catch (e) {
         ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('送信中にエラーが発生しました')));
@@ -69,11 +65,6 @@ class _SurveyPageState extends State<SurveyPage> {
             TextField(
               controller: _preferenceController,
               decoration: InputDecoration(labelText: '好みの人（カンマ区切り）'),
-            ),
-            TextField(
-              controller: _satisfactionController,
-              decoration: InputDecoration(labelText: '満足度ポイント（1-10）'),
-              keyboardType: TextInputType.number,
             ),
             SizedBox(height: 20),
             ElevatedButton(
@@ -126,30 +117,59 @@ class SeatOptimizationPage extends StatelessWidget {
       return Student(
         name: doc['name'],
         preferences: List<String>.from(doc['preference']),
-        satisfaction: doc['satisfaction'],
       );
     }).toList();
-
-    // 満足度ポイントでソート
-    students.sort((a, b) => b.satisfaction.compareTo(a.satisfaction));
 
     // 席配置の初期化
     List<List<Student?>> seatingArrangement = List.generate(6, (_) => List.filled(6, null));
 
-    for (Student student in students) {
-      _placeStudentInSeat(student, seatingArrangement);
+    // 合計ポイントを計算
+    List<StudentWithPoints> studentsWithPoints = [];
+    
+    for (var student in students) {
+      int points = _calculatePoints(student, seatingArrangement);
+      studentsWithPoints.add(StudentWithPoints(student: student, points: points));
     }
 
-    return seatingArrangement.expand((row) {
+    // 合計ポイントが高い順にソート
+    studentsWithPoints.sort((a, b) => b.points.compareTo(a.points));
+
+    // 学生を配置
+    for (var entry in studentsWithPoints) {
+      _placeStudentInSeat(entry.student, seatingArrangement);
+    }
+
+    // 最終的な座席配置を得る
+    List<Widget> seatWidgets = seatingArrangement.expand((row) {
       return row.map((student) {
         return Card(
           child: Center(child: Text(student?.name ?? '')),
         );
       });
     }).toList();
+
+    return seatWidgets;
+  }
+
+  int _calculatePoints(Student student, List<List<Student?>> seatingArrangement) {
+    int points = 0;
+
+    // 学生の好みの人が隣にいるかチェック
+    for (String preference in student.preferences) {
+      for (int row = 0; row < 6; row++) {
+        for (int col = 0; col < 6; col++) {
+          if (seatingArrangement[row][col]?.name == preference) {
+            points += 1; // 好みの人が隣にいる場合ポイントを加算
+          }
+        }
+      }
+    }
+
+    return points;
   }
 
   void _placeStudentInSeat(Student student, List<List<Student?>> seatingArrangement) {
+    // 好みの人の隣に座るように配置
     for (String preference in student.preferences) {
       for (int row = 0; row < 6; row++) {
         for (int col = 0; col < 6; col++) {
@@ -161,7 +181,7 @@ class SeatOptimizationPage extends StatelessWidget {
       }
     }
 
-    // 好みの席が見つからなかった場合は空いている席に座らせる
+    // 好みの人がいない場合は空いている席に座らせる
     _findEmptySeat(student, seatingArrangement);
   }
 
@@ -195,7 +215,13 @@ class SeatOptimizationPage extends StatelessWidget {
 class Student {
   final String name;
   final List<String> preferences;
-  final int satisfaction;
 
-  Student({required this.name, required this.preferences, required this.satisfaction});
+  Student({required this.name, required this.preferences});
+}
+
+class StudentWithPoints {
+  final Student student;
+  final int points;
+
+  StudentWithPoints({required this.student, required this.points});
 }
