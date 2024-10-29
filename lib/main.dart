@@ -13,8 +13,7 @@ class MyApp extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return MaterialApp(
-      title: '席替え最適化アプリ',
-      theme: ThemeData(primarySwatch: Colors.blue),
+      title: '席替えアプリ',
       home: SurveyPage(),
     );
   }
@@ -29,15 +28,15 @@ class _SurveyPageState extends State<SurveyPage> {
   final TextEditingController _nameController = TextEditingController();
   final TextEditingController _preferenceController = TextEditingController();
 
-  Future<void> _submitSurvey() async {
-    String name = _nameController.text.trim();
-    String preference = _preferenceController.text.trim();
+  void _submitSurvey() async {
+    String name = _nameController.text;
+    String preference = _preferenceController.text;
 
     if (name.isNotEmpty && preference.isNotEmpty) {
       try {
         await FirebaseFirestore.instance.collection('surveys').add({
           'name': name,
-          'preference': preference.split(',').map((s) => s.trim()).toList(),
+          'preference': preference,
         });
         _nameController.clear();
         _preferenceController.clear();
@@ -76,7 +75,7 @@ class _SurveyPageState extends State<SurveyPage> {
               onPressed: () {
                 Navigator.push(context, MaterialPageRoute(builder: (context) => SeatOptimizationPage()));
               },
-              child: Text('席替え結果を表示'),
+              child: Text('席替えを最適化'),
             ),
           ],
         ),
@@ -89,20 +88,17 @@ class SeatOptimizationPage extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      appBar: AppBar(title: Text('席替え結果')),
+      appBar: AppBar(title: Text('席替え最適化')),
       body: StreamBuilder<QuerySnapshot>(
         stream: FirebaseFirestore.instance.collection('surveys').snapshots(),
         builder: (context, snapshot) {
           if (snapshot.connectionState == ConnectionState.waiting) {
             return Center(child: CircularProgressIndicator());
           }
-
           if (!snapshot.hasData || snapshot.data!.docs.isEmpty) {
             return Center(child: Text('データがありません'));
           }
-
-          List<Widget> seats = _createSeatingArrangement(snapshot.data!.docs);
-
+          List<Widget> seats = _optimizeSeats(snapshot.data!.docs);
           return GridView.count(
             crossAxisCount: 6,
             children: seats,
@@ -112,103 +108,69 @@ class SeatOptimizationPage extends StatelessWidget {
     );
   }
 
-  List<Widget> _createSeatingArrangement(List<QueryDocumentSnapshot> documents) {
-    List<Student> students = documents.map((doc) {
-      return Student(
-        name: doc['name'],
-        preferences: List<String>.from(doc['preference']),
-      );
+  List<Widget> _optimizeSeats(List<QueryDocumentSnapshot> documents) {
+    Map<String, List<String>> preferences = {};
+    for (var doc in documents) {
+      String name = doc['name'];
+      String preference = doc['preference'];
+      preferences[name] = preference.split(','); // 好みをカンマで分割
+    }
+
+    List<Student> students = preferences.entries.map((entry) {
+      return Student(name: entry.key, preferences: entry.value);
     }).toList();
 
-    // 席配置の初期化
     List<List<Student?>> seatingArrangement = List.generate(6, (_) => List.filled(6, null));
+    students.shuffle();
 
-    // 合計ポイントを計算
-    List<StudentWithPoints> studentsWithPoints = [];
-    
-    for (var student in students) {
-      int points = _calculatePoints(student, seatingArrangement);
-      studentsWithPoints.add(StudentWithPoints(student: student, points: points));
+    for (Student student in students) {
+      bool seated = false;
+      for (String preference in student.preferences) {
+        for (int row = 0; row < 6; row++) {
+          for (int col = 0; col < 6; col++) {
+            if (seatingArrangement[row][col]?.name == preference) {
+              for (var delta in [
+                [0, 1], [0, -1], [1, 0], [-1, 0]
+              ]) {
+                int newRow = row + delta[0];
+                int newCol = col + delta[1];
+                if (newRow >= 0 && newRow < 6 && newCol >= 0 && newCol < 6 && seatingArrangement[newRow][newCol] == null) {
+                  seatingArrangement[newRow][newCol] = student;
+                  seated = true;
+                  break;
+                }
+              }
+              break;
+            }
+          }
+          if (seated) break;
+        }
+        if (seated) break;
+      }
+
+      if (!seated) {
+        for (int row = 0; row < 6; row++) {
+          for (int col = 0; col < 6; col++) {
+            if (seatingArrangement[row][col] == null) {
+              seatingArrangement[row][col] = student;
+              seated = true;
+              break;
+            }
+          }
+          if (seated) break;
+        }
+      }
     }
 
-    // 合計ポイントが高い順にソート
-    studentsWithPoints.sort((a, b) => b.points.compareTo(a.points));
-
-    // 学生を配置
-    for (var entry in studentsWithPoints) {
-      _placeStudentInSeat(entry.student, seatingArrangement);
-    }
-
-    // 最終的な座席配置を得る
-    List<Widget> seatWidgets = seatingArrangement.expand((row) {
-      return row.map((student) {
-        return Card(
+    List<Widget> seatWidgets = [];
+    for (var row in seatingArrangement) {
+      for (var student in row) {
+        seatWidgets.add(Card(
           child: Center(child: Text(student?.name ?? '')),
-        );
-      });
-    }).toList();
-
+        ));
+      }
+    }
     return seatWidgets;
-  }
-
-  int _calculatePoints(Student student, List<List<Student?>> seatingArrangement) {
-    int points = 0;
-
-    // 学生の好みの人が隣にいるかチェック
-    for (String preference in student.preferences) {
-      for (int row = 0; row < 6; row++) {
-        for (int col = 0; col < 6; col++) {
-          if (seatingArrangement[row][col]?.name == preference) {
-            points += 1; // 好みの人が隣にいる場合ポイントを加算
-          }
-        }
-      }
-    }
-
-    return points;
-  }
-
-  void _placeStudentInSeat(Student student, List<List<Student?>> seatingArrangement) {
-    // 好みの人の隣に座るように配置
-    for (String preference in student.preferences) {
-      for (int row = 0; row < 6; row++) {
-        for (int col = 0; col < 6; col++) {
-          if (seatingArrangement[row][col]?.name == preference) {
-            _tryToPlaceAdjacent(student, seatingArrangement, row, col);
-            return;
-          }
-        }
-      }
-    }
-
-    // 好みの人がいない場合は空いている席に座らせる
-    _findEmptySeat(student, seatingArrangement);
-  }
-
-  void _tryToPlaceAdjacent(Student student, List<List<Student?>> seatingArrangement, int row, int col) {
-    for (var delta in [[0, 1], [0, -1], [1, 0], [-1, 0]]) {
-      int newRow = row + delta[0];
-      int newCol = col + delta[1];
-      if (_isValidSeat(newRow, newCol, seatingArrangement)) {
-        seatingArrangement[newRow][newCol] = student;
-        return;
-      }
-    }
-  }
-
-  void _findEmptySeat(Student student, List<List<Student?>> seatingArrangement) {
-    for (int row = 0; row < 6; row++) {
-      for (int col = 0; col < 6; col++) {
-        if (seatingArrangement[row][col] == null) {
-          seatingArrangement[row][col] = student;
-          return;
-        }
-      }
-    }
-  }
-
-  bool _isValidSeat(int row, int col, List<List<Student?>> seatingArrangement) {
-    return row >= 0 && row < 6 && col >= 0 && col < 6 && seatingArrangement[row][col] == null;
   }
 }
 
@@ -217,11 +179,4 @@ class Student {
   final List<String> preferences;
 
   Student({required this.name, required this.preferences});
-}
-
-class StudentWithPoints {
-  final Student student;
-  final int points;
-
-  StudentWithPoints({required this.student, required this.points});
 }
