@@ -51,9 +51,9 @@ class _NumberMemoryGameState extends State<NumberMemoryGame> {
   }
 
   void generateNumber() {
-    int number = Random().nextInt(1000000); // 0-9999のランダムな数字を生成
-    displayedNumber = number.toString().padLeft(6, '0'); // 4桁に揃える
-    displayedNumber2 = number.toString().padLeft(6, '0'); // 4桁に揃える
+    int number = Random().nextInt(10000000); // 0-999999のランダムな数字を生成
+    displayedNumber = number.toString().padLeft(7, '0'); // 4桁に揃える
+    displayedNumber2 = number.toString().padLeft(7, '0'); // 4桁に揃える
     setState(() {});
 
     // 5秒後にユーザー入力を促す
