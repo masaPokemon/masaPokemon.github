@@ -29,6 +29,7 @@ class NumberMemoryGame extends StatefulWidget {
 
 class _NumberMemoryGameState extends State<NumberMemoryGame> {
   String displayedNumber = '';
+  String displayedNumber2 = '';
   final TextEditingController inputController = TextEditingController();
   final TextEditingController usernameController = TextEditingController();
   int wrongAttempts = 0;
