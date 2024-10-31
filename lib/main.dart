@@ -29,6 +29,7 @@ class NumberMemoryGame extends StatefulWidget {
 
 class _NumberMemoryGameState extends State<NumberMemoryGame> {
   String displayedNumber = '';
+  String displayedNumber2 = '';
   final TextEditingController inputController = TextEditingController();
   final TextEditingController usernameController = TextEditingController();
   int wrongAttempts = 0;
@@ -52,10 +53,11 @@ class _NumberMemoryGameState extends State<NumberMemoryGame> {
   void generateNumber() {
     int number = Random().nextInt(10000); // 0-9999のランダムな数字を生成
     displayedNumber = number.toString().padLeft(4, '0'); // 4桁に揃える
+    displayedNumber2 = number.toString().padLeft(4, '0'); // 4桁に揃える
     setState(() {});
 
     // 5秒後にユーザー入力を促す
-    timer = Timer(Duration(seconds: 5), () {
+    timer = Timer(Duration(seconds: 2), () {
       setState(() {
         displayedNumber = ''; // 数字を隠す
       });
@@ -63,7 +65,7 @@ class _NumberMemoryGameState extends State<NumberMemoryGame> {
   }
 
   void checkAnswer() {
-    if (inputController.text == displayedNumber) {
+    if (inputController.text == displayedNumber2) {
       score++;
       generateNumber();
     } else {
