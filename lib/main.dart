@@ -1,11 +1,12 @@
-import 'firebase_options.dart';
 import 'package:flutter/material.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_core/firebase_core.dart';
+import 'dart:async';
+import 'dart:math';
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
-  await Firebase.initializeApp(options: DefaultFirebaseOptions.currentPlatform);
+  await Firebase.initializeApp();
   runApp(MyApp());
 }
 
@@ -13,151 +14,160 @@ class MyApp extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return MaterialApp(
-      title: 'Quiz App',
+      title: 'Number Memory Game',
       theme: ThemeData(primarySwatch: Colors.blue),
-      home: QuizHome(),
+      home: NumberMemoryGame(),
     );
   }
 }
 
-class QuizHome extends StatefulWidget {
+class NumberMemoryGame extends StatefulWidget {
   @override
-  _QuizHomeState createState() => _QuizHomeState();
+  _NumberMemoryGameState createState() => _NumberMemoryGameState();
 }
 
-class _QuizHomeState extends State<QuizHome> {
-  int score = 0;
+class _NumberMemoryGameState extends State<NumberMemoryGame> {
+  String displayedNumber = '';
+  final TextEditingController inputController = TextEditingController();
+  final TextEditingController usernameController = TextEditingController();
   int wrongAttempts = 0;
-  List<Question> questions = [];
-  int currentQuestionIndex = 0;
-  bool gameOver = false;
+  int score = 0;
+  bool isGameOver = false;
+  bool isUsernameEntered = false;
+  Timer? timer;
 
   @override
   void initState() {
     super.initState();
-    fetchQuestions();
   }
 
-  Future<void> fetchQuestions() async {
-    var snapshot = await FirebaseFirestore.instance.collection('questions').get();
-    questions = snapshot.docs.map((doc) {
-      var data = doc.data();
-      return Question(
-        data['question'],
-        List<String>.from(data['options']),
-        data['answer'],
-      );
-    }).toList();
+  void startGame() {
+    wrongAttempts = 0;
+    score = 0;
+    isGameOver = false;
+    generateNumber();
+  }
+
+  void generateNumber() {
+    int number = Random().nextInt(10000); // 0-9999のランダムな数字を生成
+    displayedNumber = number.toString().padLeft(4, '0'); // 4桁に揃える
     setState(() {});
+
+    // 5秒後にユーザー入力を促す
+    timer = Timer(Duration(seconds: 5), () {
+      setState(() {
+        displayedNumber = ''; // 数字を隠す
+      });
+    });
   }
 
-  void answerQuestion(String answer) {
-    if (answer == questions[currentQuestionIndex].answer) {
+  void checkAnswer() {
+    if (inputController.text == displayedNumber) {
       score++;
+      generateNumber();
     } else {
       wrongAttempts++;
       if (wrongAttempts >= 3) {
         setState(() {
-          gameOver = true;
+          isGameOver = true;
+          saveScore();
         });
-        saveScore();
+      } else {
+        generateNumber();
       }
     }
-    setState(() {
-      currentQuestionIndex++;
-    });
+    inputController.clear();
   }
 
   Future<void> saveScore() async {
-    // ここにユーザー名を入力するUIを追加することを検討してください
-    String username = 'User'; // 例として固定のユーザー名
-    await FirebaseFirestore.instance.collection('users').add({
-      'username': username,
-      'score': score,
-    });
+    if (usernameController.text.isNotEmpty) {
+      await FirebaseFirestore.instance.collection('scores').add({
+        'username': usernameController.text,
+        'score': score,
+      });
+    }
   }
 
   @override
   Widget build(BuildContext context) {
-    if (gameOver) {
-      return Scaffold(
-        appBar: AppBar(title: Text('Game Over')),
-        body: Center(
-          child: Column(
-            mainAxisAlignment: MainAxisAlignment.center,
-            children: [
-              Text('Your Score: $score'),
-              ElevatedButton(
-                onPressed: () {
-                  setState(() {
-                    score = 0;
-                    wrongAttempts = 0;
-                    currentQuestionIndex = 0;
-                    gameOver = false;
-                  });
-                  fetchQuestions();
-                },
-                child: Text('Restart'),
-              ),
-            ],
-          ),
-        ),
-      );
-    }
-
-    if (questions.isEmpty) {
-      return Scaffold(body: Center(child: CircularProgressIndicator()));
-    }
-
-    if (currentQuestionIndex >= questions.length) {
-      return Scaffold(
-        appBar: AppBar(title: Text('Quiz Complete')),
-        body: Center(
-          child: Column(
-            mainAxisAlignment: MainAxisAlignment.center,
-            children: [
-              Text('Your Score: $score'),
-              ElevatedButton(
-                onPressed: () {
-                  setState(() {
-                    score = 0;
-                    wrongAttempts = 0;
-                    currentQuestionIndex = 0;
-                  });
-                  fetchQuestions();
-                },
-                child: Text('Restart'),
-              ),
-            ],
-          ),
-        ),
-      );
-    }
-
-    final currentQuestion = questions[currentQuestionIndex];
-
     return Scaffold(
-      appBar: AppBar(title: Text('Quiz')),
-      body: Column(
-        mainAxisAlignment: MainAxisAlignment.center,
-        children: [
-          Text(currentQuestion.question, style: TextStyle(fontSize: 24)),
-          ...currentQuestion.options.map((option) {
-            return ElevatedButton(
-              onPressed: () => answerQuestion(option),
-              child: Text(option),
-            );
-          }).toList(),
-        ],
+      appBar: AppBar(title: Text('Number Memory Game')),
+      body: Center(
+        child: isGameOver
+            ? Column(
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: [
+                  Text('Game Over! Your Score: $score', style: TextStyle(fontSize: 24)),
+                  ElevatedButton(
+                    onPressed: startGame,
+                    child: Text('Restart'),
+                  ),
+                ],
+              )
+            : !isUsernameEntered
+                ? Padding(
+                    padding: const EdgeInsets.all(16.0),
+                    child: Column(
+                      mainAxisAlignment: MainAxisAlignment.center,
+                      children: [
+                        Text('Enter your username:', style: TextStyle(fontSize: 20)),
+                        TextField(
+                          controller: usernameController,
+                          decoration: InputDecoration(
+                            border: OutlineInputBorder(),
+                            labelText: 'Username',
+                          ),
+                        ),
+                        SizedBox(height: 20),
+                        ElevatedButton(
+                          onPressed: () {
+                            setState(() {
+                              isUsernameEntered = true;
+                            });
+                            startGame();
+                          },
+                          child: Text('Start Game'),
+                        ),
+                      ],
+                    ),
+                  )
+                : Column(
+                    mainAxisAlignment: MainAxisAlignment.center,
+                    children: [
+                      if (displayedNumber.isNotEmpty)
+                        Text(
+                          displayedNumber,
+                          style: TextStyle(fontSize: 48),
+                        ),
+                      if (displayedNumber.isEmpty)
+                        Padding(
+                          padding: const EdgeInsets.all(16.0),
+                          child: TextField(
+                            controller: inputController,
+                            decoration: InputDecoration(
+                              border: OutlineInputBorder(),
+                              labelText: 'Enter the number',
+                            ),
+                            keyboardType: TextInputType.number,
+                            onSubmitted: (value) => checkAnswer(),
+                          ),
+                        ),
+                      SizedBox(height: 20),
+                      ElevatedButton(
+                        onPressed: checkAnswer,
+                        child: Text('Submit'),
+                      ),
+                    ],
+                  ),
       ),
     );
   }
-}
 
-class Question {
-  final String question;
-  final List<String> options;
-  final String answer;
-
-  Question(this.question, this.options, this.answer);
+  @override
+  void dispose() {
+    timer?.cancel();
+    inputController.dispose();
+    usernameController.dispose();
+    super.dispose();
+  }
 }
