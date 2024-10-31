@@ -52,6 +52,7 @@ class _NumberMemoryGameState extends State<NumberMemoryGame> {
   void generateNumber() {
     int number = Random().nextInt(10000); // 0-9999のランダムな数字を生成
     displayedNumber = number.toString().padLeft(4, '0'); // 4桁に揃える
+    displayedNumber2 = number.toString().padLeft(4, '0'); // 4桁に揃える
     setState(() {});
 
     // 5秒後にユーザー入力を促す
@@ -63,7 +64,7 @@ class _NumberMemoryGameState extends State<NumberMemoryGame> {
   }
 
   void checkAnswer() {
-    if (inputController.text == displayedNumber) {
+    if (inputController.text == displayedNumber2) {
       score++;
       generateNumber();
     } else {
