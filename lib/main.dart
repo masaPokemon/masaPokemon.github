@@ -29,7 +29,6 @@ class NumberMemoryGame extends StatefulWidget {
 
 class _NumberMemoryGameState extends State<NumberMemoryGame> {
   String displayedNumber = '';
-  String displayedNumber2 = '';
   final TextEditingController inputController = TextEditingController();
   final TextEditingController usernameController = TextEditingController();
   int wrongAttempts = 0;
@@ -53,7 +52,6 @@ class _NumberMemoryGameState extends State<NumberMemoryGame> {
   void generateNumber() {
     int number = Random().nextInt(10000); // 0-9999のランダムな数字を生成
     displayedNumber = number.toString().padLeft(4, '0'); // 4桁に揃える
-    displayedNumber2 = number.toString().padLeft(4, '0'); // 4桁に揃える
     setState(() {});
 
     // 5秒後にユーザー入力を促す
@@ -65,7 +63,7 @@ class _NumberMemoryGameState extends State<NumberMemoryGame> {
   }
 
   void checkAnswer() {
-    if (inputController.text == displayedNumber2) {
+    if (inputController.text == displayedNumber) {
       score++;
       generateNumber();
     } else {
@@ -91,6 +89,21 @@ class _NumberMemoryGameState extends State<NumberMemoryGame> {
     }
   }
 
+  Future<List<Map<String, dynamic>>> fetchScores() async {
+    var snapshot = await FirebaseFirestore.instance
+        .collection('scores')
+        .orderBy('score', descending: true)
+        .limit(10)
+        .get();
+    return snapshot.docs.map((doc) {
+      var data = doc.data();
+      return {
+        'username': data['username'],
+        'score': data['score'],
+      };
+    }).toList();
+  }
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(
@@ -104,6 +117,30 @@ class _NumberMemoryGameState extends State<NumberMemoryGame> {
                   ElevatedButton(
                     onPressed: startGame,
                     child: Text('Restart'),
+                  ),
+                  SizedBox(height: 20),
+                  FutureBuilder<List<Map<String, dynamic>>>(
+                    future: fetchScores(),
+                    builder: (context, snapshot) {
+                      if (snapshot.connectionState == ConnectionState.waiting) {
+                        return CircularProgressIndicator();
+                      }
+                      if (!snapshot.hasData || snapshot.data!.isEmpty) {
+                        return Text('No scores available.');
+                      }
+                      return Expanded(
+                        child: ListView.builder(
+                          itemCount: snapshot.data!.length,
+                          itemBuilder: (context, index) {
+                            final scoreEntry = snapshot.data![index];
+                            return ListTile(
+                              title: Text(scoreEntry['username']),
+                              trailing: Text(scoreEntry['score'].toString()),
+                            );
+                          },
+                        ),
+                      );
+                    },
                   ),
                 ],
               )
