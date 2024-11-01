@@ -1,157 +1,164 @@
 import 'package:flutter/material.dart';
-import 'dart:ui' as ui;
+import 'dart:math';
 
 void main() {
-  runApp(MyApp());
+  runApp(MyGameApp());
 }
 
-class MyApp extends StatelessWidget {
+class MyGameApp extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return MaterialApp(
-      title: 'Drawing Game',
-      theme: ThemeData(
-        primarySwatch: Colors.blue,
-      ),
-      home: DrawingScreen(),
+      title: 'Shape Drawing Game',
+      home: GameScreen(),
     );
   }
 }
 
-class DrawingScreen extends StatefulWidget {
+class GameScreen extends StatefulWidget {
   @override
-  _DrawingScreenState createState() => _DrawingScreenState();
+  _GameScreenState createState() => _GameScreenState();
 }
 
-class _DrawingScreenState extends State<DrawingScreen> {
+class _GameScreenState extends State<GameScreen> {
   List<Offset?> points = [];
   List<Shape> shapes = [];
   List<Enemy> enemies = [];
+  int score = 0;
+
+  void _addPoint(Offset point) {
+    setState(() {
+      points.add(point);
+    });
+  }
+
+  void _generateShape() {
+    if (points.isNotEmpty) {
+      // 線から円を生成する例
+      shapes.add(Shape(center: points.last!, radius: 20.0));
+      points.clear(); // 描いた線をリセット
+    }
+  }
+
+  void _spawnEnemy() {
+    // 敵をランダムな位置に生成
+    enemies.add(Enemy(position: Offset(Random().nextDouble() * 300, Random().nextDouble() * 600)));
+  }
+
+  void _checkCollisions() {
+    for (var shape in shapes) {
+      for (var enemy in enemies) {
+        if (shape.isCollidingWith(enemy)) {
+          setState(() {
+            enemies.remove(enemy);
+            shapes.remove(shape);
+            score += 10; // スコア加算
+          });
+          break; // 一度のループで一つの敵のみを削除
+        }
+      }
+    }
+  }
 
   @override
   void initState() {
     super.initState();
-    _spawnEnemies();
-  }
-
-  void _onPanUpdate(DragUpdateDetails details) {
-    setState(() {
-      points.add(details.localPosition);
+    // 定期的に敵を生成
+    Future.delayed(Duration(seconds: 2), () {
+      _spawnEnemy();
     });
-  }
-
-  void _onPanEnd(DragEndDetails details) {
-    setState(() {
-      if (points.isNotEmpty) {
-        // 線が描かれた場合、図形を生成
-        shapes.add(Shape(points));
-        points.add(null); // 線の終点
-      }
-    });
-  }
-
-  void _spawnEnemies() {
-    // 敵を生成するロジック（例としてランダムに追加）
-    for (int i = 0; i < 5; i++) {
-      enemies.add(Enemy(Offset(100.0 * i, 50.0)));
-    }
   }
 
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      appBar: AppBar(title: Text('Drawing Game')),
+      appBar: AppBar(
+        title: Text('Shape Drawing Game'),
+        actions: [
+          Padding(
+            padding: const EdgeInsets.all(8.0),
+            child: Center(child: Text('Score: $score')),
+          ),
+        ],
+      ),
       body: GestureDetector(
-        onPanUpdate: _onPanUpdate,
-        onPanEnd: _onPanEnd,
-        child: Stack(
-          children: [
-            CustomPaint(
-              painter: DrawingPainter(points, shapes, enemies),
-              size: Size.infinite,
-            ),
-            // ここにUI要素を追加することも可能
-          ],
+        onPanUpdate: (details) {
+          _addPoint(details.localPosition);
+        },
+        onPanEnd: (details) {
+          _generateShape(); // 線を描いた後に図形を生成
+        },
+        child: CustomPaint(
+          painter: GamePainter(points, shapes, enemies),
+          child: Container(),
         ),
       ),
     );
   }
 }
 
-class DrawingPainter extends CustomPainter {
+class GamePainter extends CustomPainter {
   final List<Offset?> points;
   final List<Shape> shapes;
   final List<Enemy> enemies;
 
-  DrawingPainter(this.points, this.shapes, this.enemies);
+  GamePainter(this.points, this.shapes, this.enemies);
 
   @override
   void paint(Canvas canvas, Size size) {
-    var paint = Paint()
-      ..color = Colors.blue
-      ..strokeCap = StrokeCap.round
-      ..strokeWidth = 5.0;
-
     // 線を描く
-    for (int i = 0; i < points.length - 1; i++) {
-      if (points[i] != null && points[i + 1] != null) {
-        canvas.drawLine(points[i]!, points[i + 1]!, paint);
+    if (points.isNotEmpty) {
+      final paint = Paint()
+        ..color = Colors.blue
+        ..strokeCap = StrokeCap.round
+        ..strokeWidth = 5.0;
+
+      for (int i = 0; i < points.length - 1; i++) {
+        if (points[i] != null && points[i + 1] != null) {
+          canvas.drawLine(points[i]!, points[i + 1]!, paint);
+        }
       }
     }
 
-    // 生成された図形を描く
+    // 図形を描く
+    final shapePaint = Paint()
+      ..color = Colors.green
+      ..style = PaintingStyle.fill;
+
     for (var shape in shapes) {
-      shape.draw(canvas);
+      canvas.drawCircle(shape.center, shape.radius, shapePaint);
     }
 
     // 敵を描く
+    final enemyPaint = Paint()
+      ..color = Colors.red
+      ..style = PaintingStyle.fill;
+
     for (var enemy in enemies) {
-      enemy.draw(canvas);
+      canvas.drawCircle(enemy.position, 20.0, enemyPaint);
     }
   }
 
   @override
-  bool shouldRepaint(DrawingPainter oldDelegate) {
-    return oldDelegate.points != points || oldDelegate.shapes != shapes || oldDelegate.enemies != enemies;
+  bool shouldRepaint(covariant CustomPainter oldDelegate) {
+    return true;
   }
 }
 
 class Shape {
-  final List<Offset?> points;
+  Offset center;
+  double radius;
 
-  Shape(this.points);
+  Shape({required this.center, required this.radius});
 
-  void draw(Canvas canvas) {
-    var paint = Paint()
-      ..color = Colors.red
-      ..style = PaintingStyle.fill;
-
-    // シンプルな図形（ここでは三角形を例に）
-    if (points.length > 2) {
-      Path path = Path();
-      path.moveTo(points[0]!.dx, points[0]!.dy);
-      for (int i = 1; i < points.length - 1; i++) {
-        if (points[i] != null) {
-          path.lineTo(points[i]!.dx, points[i]!.dy);
-        }
-      }
-      path.close();
-      canvas.drawPath(path, paint);
-    }
+  bool isCollidingWith(Enemy enemy) {
+    double distance = (center - enemy.position).distance;
+    return distance < (radius + 20.0); // 敵の半径を20と仮定
   }
 }
 
 class Enemy {
   Offset position;
 
-  Enemy(this.position);
-
-  void draw(Canvas canvas) {
-    var paint = Paint()
-      ..color = Colors.green
-      ..style = PaintingStyle.fill;
-
-    // 敵を描く（例として円）
-    canvas.drawCircle(position, 20, paint);
-  }
+  Enemy({required this.position});
 }
