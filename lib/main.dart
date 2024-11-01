@@ -1,15 +1,14 @@
 import 'package:flutter/material.dart';
-import 'dart:math';
+import 'dart:ui' as ui;
 
 void main() {
-  runApp(MyGameApp());
+  runApp(LineAttackGame());
 }
 
-class MyGameApp extends StatelessWidget {
+class LineAttackGame extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return MaterialApp(
-      title: '線の攻撃ゲーム',
       home: GameScreen(),
     );
   }
@@ -22,163 +21,90 @@ class GameScreen extends StatefulWidget {
 
 class _GameScreenState extends State<GameScreen> {
   List<Offset?> points = [];
-  List<Enemy> enemies = [];
-  int score = 0;
-  final Random random = Random();
-  int enemyCount = 5;
-  bool gameOver = false;
-
-  @override
-  void initState() {
-    super.initState();
-    _generateEnemies();
+  List<Offset?> enemies = [Offset(100, 100), Offset(200, 200)];
+  
+  void _onPanUpdate(DragUpdateDetails details) {
+    setState(() {
+      points.add(details.localPosition);
+    });
   }
 
-  void _generateEnemies() {
-    enemies = List.generate(enemyCount, (index) {
-      return Enemy(
-        position: Offset(random.nextDouble() * 300, random.nextDouble() * 600),
-        speed: random.nextDouble() * 2 + 1,
-      );
-    });
+  void _onPanEnd(DragEndDetails details) {
+    // 線を書いた後の処理（攻撃の判定など）
+    for (var enemy in enemies) {
+      if (_isLineIntersecting(points, enemy)) {
+        // 敵が攻撃された場合の処理
+        print('Enemy hit at ${enemy}');
+      }
+    }
+    points.clear();
+  }
+
+  bool _isLineIntersecting(List<Offset?> line, Offset? enemy) {
+    // 線と敵の当たり判定をここで実装
+    // 簡単な例として、線の距離を計算して敵が近いかどうかを判定する
+    if (line.isEmpty || enemy == null) return false;
+
+    for (int i = 0; i < line.length - 1; i++) {
+      if (_distanceToSegment(enemy, line[i]!, line[i + 1]!) < 20) {
+        return true; // 敵が攻撃された
+      }
+    }
+    return false;
+  }
+
+  double _distanceToSegment(Offset point, Offset start, Offset end) {
+    final l2 = (end - start).distanceSquared;
+    if (l2 == 0) return (point - start).distance; // startとendが同じ場合
+    final t = ((point - start).dot(end - start)) / l2;
+    if (t < 0) return (point - start).distance; // startが近い
+    if (t > 1) return (point - end).distance; // endが近い
+    final projection = start + (end - start) * t;
+    return (point - projection).distance;
   }
 
   @override
   Widget build(BuildContext context) {
-    return Scaffold(
-      appBar: AppBar(
-        title: Text('線の攻撃ゲーム'),
+    return GestureDetector(
+      onPanUpdate: _onPanUpdate,
+      onPanEnd: _onPanEnd,
+      child: CustomPaint(
+        size: Size.infinite,
+        painter: GamePainter(points, enemies),
       ),
-      body: GestureDetector(
-        onPanUpdate: (details) {
-          if (!gameOver) {
-            setState(() {
-              points.add(details.localPosition);
-            });
-          }
-        },
-        onPanEnd: (details) {
-          if (!gameOver) {
-            checkAttack();
-            points.clear(); // 描いた線をクリア
-          }
-        },
-        child: CustomPaint(
-          painter: LinePainter(points, enemies),
-          child: Container(),
-        ),
-      ),
-      floatingActionButton: FloatingActionButton(
-        onPressed: () {
-          setState(() {
-            score = 0; // スコアをリセット
-            gameOver = false; // ゲームオーバーをリセット
-            _generateEnemies(); // 敵を再生成
-          });
-        },
-        child: Icon(Icons.refresh),
-      ),
-      bottomNavigationBar: gameOver
-          ? Container(
-              color: Colors.black54,
-              padding: EdgeInsets.all(16),
-              child: Text(
-                'ゲームオーバー\nスコア: $score',
-                style: TextStyle(color: Colors.white, fontSize: 24),
-                textAlign: TextAlign.center,
-              ),
-            )
-          : null,
     );
   }
-
-  void checkAttack() {
-    // 敵に当たった場合の処理
-    enemies.removeWhere((enemy) {
-      for (int i = 0; i < points.length - 1; i++) {
-        if (enemy.isHit(points[i]!, points[i + 1]!)) {
-          setState(() {
-            score++;
-          });
-          return true; // 敵を削除
-        }
-      }
-      return false;
-    });
-
-    // 敵が画面下部に近づいた場合のゲームオーバー処理
-    if (enemies.any((enemy) => enemy.position.dy > MediaQuery.of(context).size.height - 50)) {
-      setState(() {
-        gameOver = true;
-      });
-    }
-  }
 }
 
-class Enemy {
-  Offset position;
-  double speed;
-
-  Enemy({required this.position, required this.speed});
-
-  void move() {
-    position = Offset(position.dx, position.dy + speed);
-  }
-
-  bool isHit(Offset start, Offset end) {
-    // 敵の位置が線の範囲内にあるかチェック
-    double distance = pointToLineDistance(position, start, end);
-    return distance < 20; // 衝突判定の距離
-  }
-
-  double pointToLineDistance(Offset point, Offset start, Offset end) {
-    final double A = point.dy - start.dy;
-    final double B = start.dx - end.dx;
-    final double C = start.dx * end.dy - start.dy * end.dx;
-    return (A * B + C).abs() / sqrt(A * A + B * B);
-  }
-}
-
-class LinePainter extends CustomPainter {
+class GamePainter extends CustomPainter {
   final List<Offset?> points;
-  final List<Enemy> enemies;
+  final List<Offset?> enemies;
 
-  LinePainter(this.points, this.enemies);
+  GamePainter(this.points, this.enemies);
 
   @override
   void paint(Canvas canvas, Size size) {
-    // 線を描画
-    if (points.isNotEmpty) {
-      final paint = Paint()
-        ..color = Colors.blue
-        ..strokeCap = StrokeCap.round
-        ..strokeWidth = 5.0;
+    final paintLine = Paint()
+      ..color = Colors.blue
+      ..strokeCap = StrokeCap.round
+      ..strokeWidth = 5;
 
-      for (int i = 0; i < points.length - 1; i++) {
-        if (points[i] != null && points[i + 1] != null) {
-          canvas.drawLine(points[i]!, points[i + 1]!, paint);
-        }
-      }
+    final paintEnemy = Paint()
+      ..color = Colors.red;
+
+    // 線を描画
+    for (int i = 0; i < points.length - 1; i++) {
+      canvas.drawLine(points[i]!, points[i + 1]!, paintLine);
     }
 
     // 敵を描画
-    final enemyPaint = Paint()
-      ..color = Colors.red
-      ..style = PaintingStyle.fill;
-
     for (var enemy in enemies) {
-      canvas.drawCircle(enemy.position, 15, enemyPaint);
-      enemy.move(); // 敵を移動させる
-      // 画面外に出た敵を削除
-      if (enemy.position.dy > size.height) {
-        enemies.remove(enemy);
-        break;
-      }
+      canvas.drawCircle(enemy!, 10, paintEnemy);
     }
   }
 
   @override
-  bool shouldRepaint(LinePainter oldDelegate) {
-    return oldDelegate.points != points || oldDelegate.enemies != enemies;
+  bool shouldRepaint(covariant CustomPainter oldDelegate) {
+    return true;
   }
 }
