@@ -1,215 +1,162 @@
 import 'package:flutter/material.dart';
-import 'package:cloud_firestore/cloud_firestore.dart';
-import 'package:firebase_core/firebase_core.dart';
-import 'dart:async';
 import 'dart:math';
-import 'firebase_options.dart';
 
-void main() async {
-  WidgetsFlutterBinding.ensureInitialized();
-  await Firebase.initializeApp(options: DefaultFirebaseOptions.currentPlatform);
-  runApp(MyApp());
+void main() {
+  runApp(MyGameApp());
 }
 
-class MyApp extends StatelessWidget {
+class MyGameApp extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return MaterialApp(
-      title: 'Number Memory Game',
-      theme: ThemeData(primarySwatch: Colors.blue),
-      home: NumberMemoryGame(),
+      title: '線の攻撃ゲーム',
+      home: GameScreen(),
     );
   }
 }
 
-class NumberMemoryGame extends StatefulWidget {
+class GameScreen extends StatefulWidget {
   @override
-  _NumberMemoryGameState createState() => _NumberMemoryGameState();
+  _GameScreenState createState() => _GameScreenState();
 }
 
-class _NumberMemoryGameState extends State<NumberMemoryGame> {
-  String displayedNumber = '';
-  String displayedNumber2 = '';
-  final TextEditingController inputController = TextEditingController();
-  final TextEditingController usernameController = TextEditingController();
-  int wrongAttempts = 0;
+class _GameScreenState extends State<GameScreen> {
+  List<Offset?> points = [];
+  List<Enemy> enemies = [];
   int score = 0;
-  bool isGameOver = false;
-  bool isUsernameEntered = false;
-  Timer? timer;
+  final Random random = Random();
+  int enemyCount = 5;
 
   @override
   void initState() {
     super.initState();
+    _generateEnemies();
   }
 
-  void startGame() {
-    wrongAttempts = 0;
-    score = 0;
-    isGameOver = false;
-    generateNumber();
-  }
-
-  void generateNumber() {
-    int number = Random().nextInt(10000000); // 0-999999のランダムな数字を生成
-    displayedNumber = number.toString().padLeft(7, '0'); // 4桁に揃える
-    displayedNumber2 = number.toString().padLeft(7, '0'); // 4桁に揃える
-    setState(() {});
-
-    // 5秒後にユーザー入力を促す
-    timer = Timer(Duration(seconds: 2), () {
-      setState(() {
-        displayedNumber = ''; // 数字を隠す
-      });
+  void _generateEnemies() {
+    enemies = List.generate(enemyCount, (index) {
+      return Enemy(
+        position: Offset(random.nextDouble() * 300, random.nextDouble() * 600),
+        speed: random.nextDouble() * 2 + 1,
+      );
     });
-  }
-
-  void checkAnswer() {
-    if (inputController.text == displayedNumber2) {
-      score++;
-      generateNumber();
-    } else {
-      wrongAttempts++;
-      if (wrongAttempts >= 3) {
-        setState(() {
-          isGameOver = true;
-          saveScore();
-        });
-      } else {
-        generateNumber();
-      }
-    }
-    inputController.clear();
-  }
-
-  Future<void> saveScore() async {
-    if (usernameController.text.isNotEmpty) {
-      await FirebaseFirestore.instance.collection('scores').add({
-        'username': usernameController.text,
-        'score': score,
-      });
-    }
-  }
-
-  Future<List<Map<String, dynamic>>> fetchScores() async {
-    var snapshot = await FirebaseFirestore.instance
-        .collection('scores')
-        .orderBy('score', descending: true)
-        .limit(10)
-        .get();
-    return snapshot.docs.map((doc) {
-      var data = doc.data();
-      return {
-        'username': data['username'],
-        'score': data['score'],
-      };
-    }).toList();
   }
 
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      appBar: AppBar(title: Text('Number Memory Game')),
-      body: Center(
-        child: isGameOver
-            ? Column(
-                mainAxisAlignment: MainAxisAlignment.center,
-                children: [
-                  Text('Game Over! Your Score: $score', style: TextStyle(fontSize: 24)),
-                  ElevatedButton(
-                    onPressed: startGame,
-                    child: Text('Restart'),
-                  ),
-                  SizedBox(height: 20),
-                  FutureBuilder<List<Map<String, dynamic>>>(
-                    future: fetchScores(),
-                    builder: (context, snapshot) {
-                      if (snapshot.connectionState == ConnectionState.waiting) {
-                        return CircularProgressIndicator();
-                      }
-                      if (!snapshot.hasData || snapshot.data!.isEmpty) {
-                        return Text('No scores available.');
-                      }
-                      return Expanded(
-                        child: ListView.builder(
-                          itemCount: snapshot.data!.length,
-                          itemBuilder: (context, index) {
-                            final scoreEntry = snapshot.data![index];
-                            return ListTile(
-                              title: Text(scoreEntry['username']),
-                              trailing: Text(scoreEntry['score'].toString()),
-                            );
-                          },
-                        ),
-                      );
-                    },
-                  ),
-                ],
-              )
-            : !isUsernameEntered
-                ? Padding(
-                    padding: const EdgeInsets.all(16.0),
-                    child: Column(
-                      mainAxisAlignment: MainAxisAlignment.center,
-                      children: [
-                        Text('Enter your username:', style: TextStyle(fontSize: 20)),
-                        TextField(
-                          controller: usernameController,
-                          decoration: InputDecoration(
-                            border: OutlineInputBorder(),
-                            labelText: 'Username',
-                          ),
-                        ),
-                        SizedBox(height: 20),
-                        ElevatedButton(
-                          onPressed: () {
-                            setState(() {
-                              isUsernameEntered = true;
-                            });
-                            startGame();
-                          },
-                          child: Text('Start Game'),
-                        ),
-                      ],
-                    ),
-                  )
-                : Column(
-                    mainAxisAlignment: MainAxisAlignment.center,
-                    children: [
-                      if (displayedNumber.isNotEmpty)
-                        Text(
-                          displayedNumber,
-                          style: TextStyle(fontSize: 48),
-                        ),
-                      if (displayedNumber.isEmpty)
-                        Padding(
-                          padding: const EdgeInsets.all(16.0),
-                          child: TextField(
-                            controller: inputController,
-                            decoration: InputDecoration(
-                              border: OutlineInputBorder(),
-                              labelText: 'Enter the number',
-                            ),
-                            keyboardType: TextInputType.number,
-                            onSubmitted: (value) => checkAnswer(),
-                          ),
-                        ),
-                      SizedBox(height: 20),
-                      ElevatedButton(
-                        onPressed: checkAnswer,
-                        child: Text('Submit'),
-                      ),
-                    ],
-                  ),
+      appBar: AppBar(
+        title: Text('線の攻撃ゲーム'),
+      ),
+      body: GestureDetector(
+        onPanUpdate: (details) {
+          setState(() {
+            points.add(details.localPosition);
+          });
+        },
+        onPanEnd: (details) {
+          checkAttack();
+          points.clear(); // 描いた線をクリア
+        },
+        child: CustomPaint(
+          painter: LinePainter(points, enemies),
+          child: Container(),
+        ),
+      ),
+      floatingActionButton: FloatingActionButton(
+        onPressed: () {
+          setState(() {
+            score = 0; // スコアをリセット
+            _generateEnemies(); // 敵を再生成
+          });
+        },
+        child: Icon(Icons.refresh),
       ),
     );
   }
 
+  void checkAttack() {
+    // 敵に当たった場合の処理
+    enemies.removeWhere((enemy) {
+      // 線が敵に当たったかをチェック
+      for (int i = 0; i < points.length - 1; i++) {
+        if (enemy.isHit(points[i]!, points[i + 1]!)) {
+          setState(() {
+            score++;
+          });
+          return true; // 敵を削除
+        }
+      }
+      return false;
+    });
+    print('Score: $score');
+  }
+}
+
+class Enemy {
+  Offset position;
+  double speed;
+
+  Enemy({required this.position, required this.speed});
+
+  void move() {
+    position = Offset(position.dx, position.dy + speed);
+  }
+
+  bool isHit(Offset start, Offset end) {
+    // 敵の位置が線の範囲内にあるかチェック
+    double distance = pointToLineDistance(position, start, end);
+    return distance < 20; // 衝突判定の距離
+  }
+
+  double pointToLineDistance(Offset point, Offset start, Offset end) {
+    final double A = point.dy - start.dy;
+    final double B = start.dx - end.dx;
+    final double C = start.dx * end.dy - start.dy * end.dx;
+    return (A * B + C).abs() / sqrt(A * A + B * B);
+  }
+}
+
+class LinePainter extends CustomPainter {
+  final List<Offset?> points;
+  final List<Enemy> enemies;
+
+  LinePainter(this.points, this.enemies);
+
   @override
-  void dispose() {
-    timer?.cancel();
-    inputController.dispose();
-    usernameController.dispose();
-    super.dispose();
+  void paint(Canvas canvas, Size size) {
+    // 線を描画
+    if (points.isNotEmpty) {
+      final paint = Paint()
+        ..color = Colors.blue
+        ..strokeCap = StrokeCap.round
+        ..strokeWidth = 5.0;
+
+      for (int i = 0; i < points.length - 1; i++) {
+        if (points[i] != null && points[i + 1] != null) {
+          canvas.drawLine(points[i]!, points[i + 1]!, paint);
+        }
+      }
+    }
+
+    // 敵を描画
+    final enemyPaint = Paint()
+      ..color = Colors.red
+      ..style = PaintingStyle.fill;
+
+    for (var enemy in enemies) {
+      canvas.drawCircle(enemy.position, 15, enemyPaint);
+      enemy.move(); // 敵を移動させる
+      // 画面外に出た敵を削除
+      if (enemy.position.dy > size.height) {
+        enemies.remove(enemy);
+        break;
+      }
+    }
+  }
+
+  @override
+  bool shouldRepaint(LinePainter oldDelegate) {
+    return oldDelegate.points != points || oldDelegate.enemies != enemies;
   }
 }
