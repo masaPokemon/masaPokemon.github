@@ -26,6 +26,7 @@ class _GameScreenState extends State<GameScreen> {
   int score = 0;
   final Random random = Random();
   int enemyCount = 5;
+  bool gameOver = false;
 
   @override
   void initState() {
@@ -50,13 +51,17 @@ class _GameScreenState extends State<GameScreen> {
       ),
       body: GestureDetector(
         onPanUpdate: (details) {
-          setState(() {
-            points.add(details.localPosition);
-          });
+          if (!gameOver) {
+            setState(() {
+              points.add(details.localPosition);
+            });
+          }
         },
         onPanEnd: (details) {
-          checkAttack();
-          points.clear(); // 描いた線をクリア
+          if (!gameOver) {
+            checkAttack();
+            points.clear(); // 描いた線をクリア
+          }
         },
         child: CustomPaint(
           painter: LinePainter(points, enemies),
@@ -67,18 +72,29 @@ class _GameScreenState extends State<GameScreen> {
         onPressed: () {
           setState(() {
             score = 0; // スコアをリセット
+            gameOver = false; // ゲームオーバーをリセット
             _generateEnemies(); // 敵を再生成
           });
         },
         child: Icon(Icons.refresh),
       ),
+      bottomNavigationBar: gameOver
+          ? Container(
+              color: Colors.black54,
+              padding: EdgeInsets.all(16),
+              child: Text(
+                'ゲームオーバー\nスコア: $score',
+                style: TextStyle(color: Colors.white, fontSize: 24),
+                textAlign: TextAlign.center,
+              ),
+            )
+          : null,
     );
   }
 
   void checkAttack() {
     // 敵に当たった場合の処理
     enemies.removeWhere((enemy) {
-      // 線が敵に当たったかをチェック
       for (int i = 0; i < points.length - 1; i++) {
         if (enemy.isHit(points[i]!, points[i + 1]!)) {
           setState(() {
@@ -89,7 +105,13 @@ class _GameScreenState extends State<GameScreen> {
       }
       return false;
     });
-    print('Score: $score');
+
+    // 敵が画面下部に近づいた場合のゲームオーバー処理
+    if (enemies.any((enemy) => enemy.position.dy > MediaQuery.of(context).size.height - 50)) {
+      setState(() {
+        gameOver = true;
+      });
+    }
   }
 }
 
