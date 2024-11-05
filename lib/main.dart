@@ -119,8 +119,7 @@ class _ExchangeBoardState extends State<ExchangeBoard> {
                     var exchange = exchangeRequests[index];
                     return ListTile(
                       title: Text(exchange['name'] + ' さん'),
-                      subtitle: Text(exchange['card']),
-                      child: Text(exchange['hosii']),
+                      subtitle: Text(exchange['card'] + '=>' + exchange['hosii']),
                       trailing: exchange['status'] == 'completed'
                           ? Icon(Icons.check, color: Colors.green) // 完了時にチェックアイコン
                           : ElevatedButton(
