@@ -30,6 +30,7 @@ class ExchangeBoard extends StatefulWidget {
 class _ExchangeBoardState extends State<ExchangeBoard> {
   final TextEditingController _cardController = TextEditingController();
   final TextEditingController _nameController = TextEditingController();
+  final TextEditingController _hosiiController = TextEditingController();
 
   // Firestoreインスタンス
   final FirebaseFirestore _firestore = FirebaseFirestore.instance;
@@ -38,17 +39,20 @@ class _ExchangeBoardState extends State<ExchangeBoard> {
   Future<void> _addExchangeRequest() async {
     String card = _cardController.text.trim();
     String name = _nameController.text.trim();
+    String hosii = _hosiiController.text.trim();
 
     if (card.isNotEmpty && name.isNotEmpty) {
       await _firestore.collection('exchanges').add({
         'name': name,
         'card': card,
+        'hosii': hosii,
         'status': 'pending', // 初期状態は「交換待ち」
       });
 
       // フィールドをクリア
       _cardController.clear();
       _nameController.clear();
+      _hosiiController.clear();
     }
   }
 
@@ -83,6 +87,13 @@ class _ExchangeBoardState extends State<ExchangeBoard> {
               decoration: InputDecoration(labelText: '交換したいカード'),
             ),
           ),
+          Padding(
+            padding: const EdgeInsets.all(8.0),
+            child: TextField(
+              controller: _hosiiController,
+              decoration: InputDecoration(labelText: '交換したいカード'),
+            ),
+          ),
           // 交換リクエスト投稿ボタン
           ElevatedButton(
             onPressed: _addExchangeRequest,
@@ -109,6 +120,7 @@ class _ExchangeBoardState extends State<ExchangeBoard> {
                     return ListTile(
                       title: Text(exchange['name'] + ' さん'),
                       subtitle: Text(exchange['card']),
+                      child: Text(exchange['hosii']),
                       trailing: exchange['status'] == 'completed'
                           ? Icon(Icons.check, color: Colors.green) // 完了時にチェックアイコン
                           : ElevatedButton(
