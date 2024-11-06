@@ -3,6 +3,9 @@ import 'package:firebase_core/firebase_core.dart';
 import 'package:flutter/material.dart';
 import 'screens/home_screen.dart';
 import 'services/firebase_service.dart';
+import 'screens/game_screen.dart';
+import 'screens/login_screen.dart';
+import 'screens/result_screen.dart';
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
