@@ -1,21 +1,20 @@
-import 'firebase_options.dart';
+import 'dart:async';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
-import 'package:firebase_core/firebase_core.dart';
 import 'package:flutter/material.dart';
-import 'dart:async';
+import 'package:firebase_core/firebase_core.dart';
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
-  await Firebase.initializeApp(options: DefaultFirebaseOptions.currentPlatform);
-  runApp(MyApp());
+  await Firebase.initializeApp();
+  runApp(GameApp());
 }
 
-class MyApp extends StatelessWidget {
+class GameApp extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return MaterialApp(
-      title: 'Online Gunfight Game',
+      title: 'Online Shooter Game',
       theme: ThemeData(
         primarySwatch: Colors.blue,
       ),
@@ -31,80 +30,40 @@ class GameScreen extends StatefulWidget {
 
 class _GameScreenState extends State<GameScreen> with TickerProviderStateMixin {
   late AnimationController _controller;
-  late FirebaseAuth _auth;
-  late FirebaseFirestore _firestore;
-  late String _userId;
-  double playerX = 100, playerY = 100; // Player's position
-  double bulletX = -1, bulletY = -1; // Bullet's position (off-screen initially)
+  late String playerId;
+  double playerX = 100.0, playerY = 100.0;
+  double bulletX = 0.0, bulletY = 0.0;
+  bool isFiring = false;
+  final FirestoreService firestoreService = FirestoreService();
 
   @override
   void initState() {
     super.initState();
-    _auth = FirebaseAuth.instance;
-    _firestore = FirebaseFirestore.instance;
     _controller = AnimationController(vsync: this, duration: Duration(milliseconds: 16))
       ..addListener(_gameLoop);
     _controller.repeat();
-    _signInAnonymously();
+
+    _initializePlayer();
   }
 
-  // Sign-in anonymously to Firebase
-  Future<void> _signInAnonymously() async {
-    UserCredential userCredential = await _auth.signInAnonymously();
-    setState(() {
-      _userId = userCredential.user!.uid;
-    });
-
-    // Listen to the player's position in Firestore
-    _firestore.collection('players').doc(_userId).snapshots().listen((snapshot) {
-      if (snapshot.exists) {
-        setState(() {
-          playerX = snapshot['position']['x'].toDouble();
-          playerY = snapshot['position']['y'].toDouble();
-        });
-      }
-    });
-
-    // Initialize the player's position in Firestore
-    _firestore.collection('players').doc(_userId).set({
-      'position': {'x': playerX, 'y': playerY},
-    });
-  }
-
-  // Game loop
-  void _gameLoop() {
-    setState(() {
-      // Update the bullet's position
-      if (bulletY >= 0) {
-        bulletY -= 5; // Move bullet upwards
-      }
-    });
-    _syncPlayerPosition();
-  }
-
-  // Sync player position to Firebase
-  Future<void> _syncPlayerPosition() async {
-    if (_userId.isNotEmpty) {
-      await _firestore.collection('players').doc(_userId).update({
-        'position': {'x': playerX, 'y': playerY},
+  void _initializePlayer() async {
+    User? user = await signInAnonymously();
+    if (user != null) {
+      setState(() {
+        playerId = user.uid;
       });
+      firestoreService.addPlayer(playerId, playerX, playerY);
     }
   }
 
-  // Fire a bullet
-  void _fireBullet() {
+  void _gameLoop() {
     setState(() {
-      bulletX = playerX;
-      bulletY = playerY;
+      if (isFiring) {
+        bulletY -= 5;
+      }
     });
-  }
-
-  // Move player on screen
-  void _movePlayer(Offset offset) {
-    setState(() {
-      playerX += offset.dx;
-      playerY += offset.dy;
-    });
+    firestoreService.updatePlayerPosition(playerId, playerX, playerY);
+    firestoreService.updateBulletPosition(playerId, bulletX, bulletY);
   }
 
   @override
@@ -116,89 +75,102 @@ class _GameScreenState extends State<GameScreen> with TickerProviderStateMixin {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      appBar: AppBar(
-        title: Text("Online Gunfight Game"),
-      ),
       body: Stack(
         children: [
-          // Draw background
-          Positioned.fill(
-            child: Container(
-              color: Colors.green,
+          CustomPaint(
+            painter: GamePainter(playerX, playerY, bulletX, bulletY),
+            child: GestureDetector(
+              onPanUpdate: (details) {
+                setState(() {
+                  playerX = details.localPosition.dx;
+                  playerY = details.localPosition.dy;
+                });
+              },
+              onTap: () {
+                setState(() {
+                  isFiring = true;
+                  bulletX = playerX;
+                  bulletY = playerY;
+                });
+              },
+              child: Container(color: Colors.white),
             ),
           ),
-          // Draw player
           Positioned(
-            left: playerX,
-            top: playerY,
-            child: Icon(
-              Icons.person,
-              size: 50,
-              color: Colors.blue,
-            ),
-          ),
-          // Draw bullet
-          if (bulletY >= 0)
-            Positioned(
-              left: bulletX,
-              top: bulletY,
-              child: Icon(
-                Icons.fiber_manual_record,
-                size: 10,
-                color: Colors.red,
-              ),
-            ),
-          // Controls
-          Positioned(
-            bottom: 20,
+            top: 20,
             left: 20,
             child: ElevatedButton(
               onPressed: () {
-                _movePlayer(Offset(0, -10)); // Move up
+                Navigator.pop(context);
               },
-              child: Text("Up"),
-            ),
-          ),
-          Positioned(
-            bottom: 20,
-            left: 100,
-            child: ElevatedButton(
-              onPressed: () {
-                _movePlayer(Offset(-10, 0)); // Move left
-              },
-              child: Text("Left"),
-            ),
-          ),
-          Positioned(
-            bottom: 20,
-            left: 180,
-            child: ElevatedButton(
-              onPressed: () {
-                _movePlayer(Offset(10, 0)); // Move right
-              },
-              child: Text("Right"),
-            ),
-          ),
-          Positioned(
-            bottom: 20,
-            left: 260,
-            child: ElevatedButton(
-              onPressed: () {
-                _movePlayer(Offset(0, 10)); // Move down
-              },
-              child: Text("Down"),
-            ),
-          ),
-          Positioned(
-            bottom: 100,
-            left: 150,
-            child: ElevatedButton(
-              onPressed: _fireBullet, // Fire bullet
-              child: Text("Fire"),
+              child: Text("Exit Game"),
             ),
           ),
         ],
       ),
     );
   }
+}
+
+class GamePainter extends CustomPainter {
+  final double playerX, playerY, bulletX, bulletY;
+
+  GamePainter(this.playerX, this.playerY, this.bulletX, this.bulletY);
+
+  @override
+  void paint(Canvas canvas, Size size) {
+    final Paint playerPaint = Paint()..color = Colors.blue;
+    final Paint bulletPaint = Paint()..color = Colors.red;
+
+    // Draw player
+    canvas.drawCircle(Offset(playerX, playerY), 20, playerPaint);
+
+    // Draw bullet
+    if (bulletY > 0) {
+      canvas.drawCircle(Offset(bulletX, bulletY), 5, bulletPaint);
+    }
+  }
+
+  @override
+  bool shouldRepaint(CustomPainter oldDelegate) => true;
+}
+
+class FirestoreService {
+  final FirebaseFirestore _firestore = FirebaseFirestore.instance;
+
+  // Add player to Firestore
+  Future<void> addPlayer(String playerId, double x, double y) async {
+    await _firestore.collection('players').doc(playerId).set({
+      'position': {'x': x, 'y': y},
+    });
+  }
+
+  // Update player position
+  Future<void> updatePlayerPosition(String playerId, double x, double y) async {
+    await _firestore.collection('players').doc(playerId).update({
+      'position': {'x': x, 'y': y},
+    });
+  }
+
+  // Update bullet position
+  Future<void> updateBulletPosition(String playerId, double x, double y) async {
+    await _firestore.collection('bullets').doc(playerId).set({
+      'position': {'x': x, 'y': y},
+    });
+  }
+
+  // Get player position stream
+  Stream<DocumentSnapshot> getPlayerPosition(String playerId) {
+    return _firestore.collection('players').doc(playerId).snapshots();
+  }
+
+  // Get bullet position stream
+  Stream<DocumentSnapshot> getBulletPosition(String playerId) {
+    return _firestore.collection('bullets').doc(playerId).snapshots();
+  }
+}
+
+Future<User?> signInAnonymously() async {
+  UserCredential userCredential = await FirebaseAuth.instance.signInAnonymously();
+  return userCredential.user;
 }
