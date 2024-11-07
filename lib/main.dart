@@ -1,8 +1,9 @@
+import 'firebase_options.dart';
+import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:firebase_auth/firebase_auth.dart';
 import 'package:firebase_core/firebase_core.dart';
 import 'package:flutter/material.dart';
-import 'package:cloud_firestore/cloud_firestore.dart';
-import 'package:provider/provider.dart';
-import 'firebase_options.dart';
+import 'dart:async';
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
@@ -13,166 +14,191 @@ void main() async {
 class MyApp extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
-    return ChangeNotifierProvider(
-      create: (_) => GameStateProvider(),
-      child: MaterialApp(
-        home: GameScreen(),
+    return MaterialApp(
+      title: 'Online Gunfight Game',
+      theme: ThemeData(
+        primarySwatch: Colors.blue,
       ),
+      home: GameScreen(),
     );
   }
 }
 
-class GameStateProvider with ChangeNotifier {
-  FirebaseFirestore firestore = FirebaseFirestore.instance;
-
-  // プレイヤーの位置、弾、敵の状態を保持
-  Map<String, dynamic> playerState = {};
-  List<Map<String, dynamic>> bullets = [];
-  List<Map<String, dynamic>> enemies = [];
-
-  // プレイヤーの位置を更新
-  void updatePlayerPosition(String playerId, double x, double y) {
-    firestore.collection('players').doc(playerId).update({
-      'position': {'x': x, 'y': y},
-    });
-    playerState['position'] = {'x': x, 'y': y};
-    notifyListeners();
-  }
-
-  // 弾を追加
-  void addBullet(String playerId, double x, double y, double angle) {
-    firestore.collection('bullets').add({
-      'playerId': playerId,
-      'position': {'x': x, 'y': y},
-      'angle': angle,
-    });
-    bullets.add({'playerId': playerId, 'position': {'x': x, 'y': y}, 'angle': angle});
-    notifyListeners();
-  }
-
-  // 敵を追加
-  void addEnemy(String enemyId, double x, double y) {
-    firestore.collection('enemies').add({
-      'position': {'x': x, 'y': y},
-      'health': 100, // 敵のHP
-    });
-    enemies.add({'id': enemyId, 'position': {'x': x, 'y': y}, 'health': 100});
-    notifyListeners();
-  }
-
-  // ダメージを与える
-  void applyDamage(String enemyId, int damage) {
-    var enemyRef = firestore.collection('enemies').doc(enemyId);
-    enemyRef.get().then((doc) {
-      if (doc.exists) {
-        int currentHealth = doc['health'];
-        if (currentHealth > damage) {
-          enemyRef.update({'health': currentHealth - damage});
-        } else {
-          enemyRef.update({'health': 0});
-        }
-      }
-    });
-  }
-
-  // 弾が敵に当たったかをチェック
-  void checkBulletCollisions() {
-    for (var bullet in bullets) {
-      for (var enemy in enemies) {
-        double bulletX = bullet['position']['x'];
-        double bulletY = bullet['position']['y'];
-        double enemyX = enemy['position']['x'];
-        double enemyY = enemy['position']['y'];
-
-        // 衝突判定（簡単な距離で判定）
-        double distance = ((bulletX - enemyX).abs() + (bulletY - enemyY).abs());
-        if (distance < 20) { // 20は衝突判定の距離
-          applyDamage(enemy['id'], 20); // ダメージを与える（20ダメージ）
-        }
-      }
-    }
-  }
+class GameScreen extends StatefulWidget {
+  @override
+  _GameScreenState createState() => _GameScreenState();
 }
 
-class GameScreen extends StatelessWidget {
+class _GameScreenState extends State<GameScreen> with TickerProviderStateMixin {
+  late AnimationController _controller;
+  late FirebaseAuth _auth;
+  late FirebaseFirestore _firestore;
+  late String _userId;
+  double playerX = 100, playerY = 100; // Player's position
+  double bulletX = -1, bulletY = -1; // Bullet's position (off-screen initially)
+
+  @override
+  void initState() {
+    super.initState();
+    _auth = FirebaseAuth.instance;
+    _firestore = FirebaseFirestore.instance;
+    _controller = AnimationController(vsync: this, duration: Duration(milliseconds: 16))
+      ..addListener(_gameLoop);
+    _controller.repeat();
+    _signInAnonymously();
+  }
+
+  // Sign-in anonymously to Firebase
+  Future<void> _signInAnonymously() async {
+    UserCredential userCredential = await _auth.signInAnonymously();
+    setState(() {
+      _userId = userCredential.user!.uid;
+    });
+
+    // Listen to the player's position in Firestore
+    _firestore.collection('players').doc(_userId).snapshots().listen((snapshot) {
+      if (snapshot.exists) {
+        setState(() {
+          playerX = snapshot['position']['x'].toDouble();
+          playerY = snapshot['position']['y'].toDouble();
+        });
+      }
+    });
+
+    // Initialize the player's position in Firestore
+    _firestore.collection('players').doc(_userId).set({
+      'position': {'x': playerX, 'y': playerY},
+    });
+  }
+
+  // Game loop
+  void _gameLoop() {
+    setState(() {
+      // Update the bullet's position
+      if (bulletY >= 0) {
+        bulletY -= 5; // Move bullet upwards
+      }
+    });
+    _syncPlayerPosition();
+  }
+
+  // Sync player position to Firebase
+  Future<void> _syncPlayerPosition() async {
+    if (_userId.isNotEmpty) {
+      await _firestore.collection('players').doc(_userId).update({
+        'position': {'x': playerX, 'y': playerY},
+      });
+    }
+  }
+
+  // Fire a bullet
+  void _fireBullet() {
+    setState(() {
+      bulletX = playerX;
+      bulletY = playerY;
+    });
+  }
+
+  // Move player on screen
+  void _movePlayer(Offset offset) {
+    setState(() {
+      playerX += offset.dx;
+      playerY += offset.dy;
+    });
+  }
+
+  @override
+  void dispose() {
+    _controller.dispose();
+    super.dispose();
+  }
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(
+      appBar: AppBar(
+        title: Text("Online Gunfight Game"),
+      ),
       body: Stack(
         children: [
-          // プレイヤーを表示
-          Player(playerId: 'player1'),
-
-          // 敵を表示
-          ...context.watch<GameStateProvider>().enemies.map((enemy) {
-            return Positioned(
-              left: enemy['position']['x'],
-              top: enemy['position']['y'],
-              child: Enemy(enemyId: enemy['id']),
-            );
-          }).toList(),
-
-          // 弾を表示
-          ...context.watch<GameStateProvider>().bullets.map((bullet) {
-            return Positioned(
-              left: bullet['position']['x'],
-              top: bullet['position']['y'],
-              child: Bullet(),
-            );
-          }).toList(),
+          // Draw background
+          Positioned.fill(
+            child: Container(
+              color: Colors.green,
+            ),
+          ),
+          // Draw player
+          Positioned(
+            left: playerX,
+            top: playerY,
+            child: Icon(
+              Icons.person,
+              size: 50,
+              color: Colors.blue,
+            ),
+          ),
+          // Draw bullet
+          if (bulletY >= 0)
+            Positioned(
+              left: bulletX,
+              top: bulletY,
+              child: Icon(
+                Icons.fiber_manual_record,
+                size: 10,
+                color: Colors.red,
+              ),
+            ),
+          // Controls
+          Positioned(
+            bottom: 20,
+            left: 20,
+            child: ElevatedButton(
+              onPressed: () {
+                _movePlayer(Offset(0, -10)); // Move up
+              },
+              child: Text("Up"),
+            ),
+          ),
+          Positioned(
+            bottom: 20,
+            left: 100,
+            child: ElevatedButton(
+              onPressed: () {
+                _movePlayer(Offset(-10, 0)); // Move left
+              },
+              child: Text("Left"),
+            ),
+          ),
+          Positioned(
+            bottom: 20,
+            left: 180,
+            child: ElevatedButton(
+              onPressed: () {
+                _movePlayer(Offset(10, 0)); // Move right
+              },
+              child: Text("Right"),
+            ),
+          ),
+          Positioned(
+            bottom: 20,
+            left: 260,
+            child: ElevatedButton(
+              onPressed: () {
+                _movePlayer(Offset(0, 10)); // Move down
+              },
+              child: Text("Down"),
+            ),
+          ),
+          Positioned(
+            bottom: 100,
+            left: 150,
+            child: ElevatedButton(
+              onPressed: _fireBullet, // Fire bullet
+              child: Text("Fire"),
+            ),
+          ),
         ],
       ),
-    );
-  }
-}
-
-class Player extends StatelessWidget {
-  final String playerId;
-  Player({required this.playerId});
-
-  @override
-  Widget build(BuildContext context) {
-    return GestureDetector(
-      onPanUpdate: (details) {
-        double newX = details.localPosition.dx;
-        double newY = details.localPosition.dy;
-        // Firebaseに位置更新
-        context.read<GameStateProvider>().updatePlayerPosition(playerId, newX, newY);
-      },
-      onTap: () {
-        // 弾を発射
-        context.read<GameStateProvider>().addBullet(playerId, 100, 100, 0);
-      },
-      child: Container(
-        width: 50,
-        height: 50,
-        color: Colors.blue,
-      ),
-    );
-  }
-}
-
-class Enemy extends StatelessWidget {
-  final String enemyId;
-  Enemy({required this.enemyId});
-
-  @override
-  Widget build(BuildContext context) {
-    return Container(
-      width: 50,
-      height: 50,
-      color: Colors.red,
-    );
-  }
-}
-
-class Bullet extends StatelessWidget {
-  @override
-  Widget build(BuildContext context) {
-    return Container(
-      width: 10,
-      height: 10,
-      color: Colors.black,
     );
   }
 }
