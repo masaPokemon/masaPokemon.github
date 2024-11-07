@@ -3,6 +3,7 @@ import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
 import 'package:firebase_core/firebase_core.dart';
+import 'firebase_options.dart';
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
@@ -173,4 +174,111 @@ class FirestoreService {
 Future<User?> signInAnonymously() async {
   UserCredential userCredential = await FirebaseAuth.instance.signInAnonymously();
   return userCredential.user;
+}
+
+class GameLobbyScreen extends StatefulWidget {
+  @override
+  _GameLobbyScreenState createState() => _GameLobbyScreenState();
+}
+
+class _GameLobbyScreenState extends State<GameLobbyScreen> {
+  final TextEditingController roomController = TextEditingController();
+
+  void createRoom() async {
+    final roomRef = FirebaseFirestore.instance.collection('rooms').doc();
+    await roomRef.set({
+      'host': FirebaseAuth.instance.currentUser?.uid,
+      'players': [],
+      'status': 'waiting', // ゲームの状態（待機中、進行中など）
+    });
+  }
+
+  void joinRoom(String roomId) async {
+    final roomRef = FirebaseFirestore.instance.collection('rooms').doc(roomId);
+    await roomRef.update({
+      'players': FieldValue.arrayUnion([FirebaseAuth.instance.currentUser?.uid]),
+    });
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Scaffold(
+      appBar: AppBar(title: Text('ゲームロビー')),
+      body: Column(
+        children: [
+          ElevatedButton(
+            onPressed: createRoom,
+            child: Text('新しい部屋を作成'),
+          ),
+          TextField(
+            controller: roomController,
+            decoration: InputDecoration(labelText: '部屋IDを入力'),
+          ),
+          ElevatedButton(
+            onPressed: () => joinRoom(roomController.text),
+            child: Text('部屋に参加'),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class GameScreen extends StatefulWidget {
+  final String roomId;
+
+  GameScreen({required this.roomId});
+
+  @override
+  _GameScreenState createState() => _GameScreenState();
+}
+
+class _GameScreenState extends State<GameScreen> {
+  late DocumentReference roomRef;
+
+  @override
+  void initState() {
+    super.initState();
+    roomRef = FirebaseFirestore.instance.collection('rooms').doc(widget.roomId);
+  }
+
+  void startGame() async {
+    // ここでゲームを開始するロジックを実装
+    await roomRef.update({'status': 'playing'});
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return StreamBuilder<DocumentSnapshot>(
+      stream: roomRef.snapshots(),
+      builder: (context, snapshot) {
+        if (snapshot.connectionState == ConnectionState.waiting) {
+          return Center(child: CircularProgressIndicator());
+        }
+
+        if (snapshot.hasData) {
+          final roomData = snapshot.data!;
+          final players = List.from(roomData['players']);
+          final status = roomData['status'];
+
+          return Scaffold(
+            appBar: AppBar(title: Text('ゲーム: ${widget.roomId}')),
+            body: Column(
+              children: [
+                Text('ゲーム状態: $status'),
+                Text('参加者: ${players.join(', ')}'),
+                if (status == 'waiting')
+                  ElevatedButton(
+                    onPressed: startGame,
+                    child: Text('ゲームを開始'),
+                  ),
+              ],
+            ),
+          );
+        }
+
+        return Center(child: Text('エラーが発生しました'));
+      },
+    );
+  }
 }
