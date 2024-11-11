@@ -8,11 +8,8 @@ environment:
 dependencies:
   flutter:
     sdk: flutter
-  firebase_core: ^3.6.0
-  firebase_storage: ^12.3.3
-  cloud_firestore: ^5.4.4
-  firebase_auth: ^5.3.1
-  flame: ^1.21.0
+  tflite_flutter: ^0.9.0
+  tflite_flutter_helper: ^0.3.0
 
 flutter_test:
     sdk: flutter
