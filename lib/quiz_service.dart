@@ -9,7 +9,7 @@ class QuizService {
     await matchRef.set({
       'userId': userId,
       'score': score,
-      'timestamp': FieldValue.serverTimestamp(),
+      'timestamp': DateTime.now(),
     });
   }
 
