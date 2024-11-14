@@ -1,7 +1,9 @@
 import 'package:flutter/material.dart';
-import 'package:quiz_app/auth_service.dart';
-import 'leaderboard_screen.dart';
 import 'package:firebase_auth/firebase_auth.dart';
+import 'package:quiz_app/auth_service.dart';
+import 'package:quiz_app/quiz_service.dart';
+import 'leaderboard_screen.dart';
+import 'quiz_screen.dart'; // クイズ画面のインポート
 
 class HomeScreen extends StatefulWidget {
   @override
@@ -10,9 +12,10 @@ class HomeScreen extends StatefulWidget {
 
 class _HomeScreenState extends State<HomeScreen> {
   final AuthService _authService = AuthService();
+  final QuizService _quizService = QuizService();
+  
   User? _user;
   
-  // ログイン情報
   final _emailController = TextEditingController();
   final _passwordController = TextEditingController();
   final _signUpEmailController = TextEditingController();
@@ -26,15 +29,14 @@ class _HomeScreenState extends State<HomeScreen> {
     _checkUser();
   }
 
-  // ユーザーがログインしているかチェック
   void _checkUser() {
     FirebaseAuth.instance
       .authStateChanges()
       .listen((User? user) {
-        setState(() {
-          _user = user;
-        });
+      setState(() {
+        _user = user;
       });
+    });
   }
 
   @override
@@ -46,31 +48,41 @@ class _HomeScreenState extends State<HomeScreen> {
             ? _isLoginMode
                 ? _buildLoginForm()
                 : _buildSignUpForm()
-            : Column(
-                mainAxisAlignment: MainAxisAlignment.center,
-                children: [
-                  Text('ようこそ, ${_user!.email}!'),
-                  ElevatedButton(
-                    onPressed: () {
-                      Navigator.push(
-                        context,
-                        MaterialPageRoute(builder: (context) => LeaderboardScreen()),
-                      );
-                    },
-                    child: Text('ランキングを見る'),
-                  ),
-                  ElevatedButton(
-                    onPressed: () async {
-                      await _authService.signOut();
-                      setState(() {
-                        _user = null;
-                      });
-                    },
-                    child: Text('ログアウト'),
-                  ),
-                ],
-              ),
+            : _buildUserLoggedIn(),
       ),
+    );
+  }
+
+  // ユーザーがログインしている場合の画面
+  Widget _buildUserLoggedIn() {
+    return Column(
+      mainAxisAlignment: MainAxisAlignment.center,
+      children: [
+        Text('ようこそ, ${_user!.email}!'),
+        ElevatedButton(
+          onPressed: () {
+            Navigator.push(
+              context,
+              MaterialPageRoute(builder: (context) => LeaderboardScreen()),
+            );
+          },
+          child: Text('ランキングを見る'),
+        ),
+        ElevatedButton(
+          onPressed: () async {
+            await _authService.signOut();
+            setState(() {
+              _user = null;
+            });
+          },
+          child: Text('ログアウト'),
+        ),
+        // マッチング開始ボタン
+        ElevatedButton(
+          onPressed: _startMatch,
+          child: Text('マッチングを開始'),
+        ),
+      ],
     );
   }
 
@@ -195,5 +207,40 @@ class _HomeScreenState extends State<HomeScreen> {
         ],
       ),
     );
+  }
+
+  // マッチングを開始する処理
+  void _startMatch() async {
+    if (_user != null) {
+      // Firebase Firestoreに対戦を開始する情報を送信（マッチング用）
+      final matchId = await _quizService.startMatch(_user!.uid);
+
+      // マッチングが成功したらクイズ画面に遷移
+      if (matchId != null) {
+        Navigator.push(
+          context,
+          MaterialPageRoute(
+            builder: (context) => QuizScreen(matchId: matchId),
+          ),
+        );
+      } else {
+        // マッチング失敗の場合の処理
+        showDialog(
+          context: context,
+          builder: (context) => AlertDialog(
+            title: Text('マッチング失敗'),
+            content: Text('対戦相手が見つかりませんでした。'),
+            actions: [
+              TextButton(
+                onPressed: () {
+                  Navigator.pop(context);
+                },
+                child: Text('OK'),
+              ),
+            ],
+          ),
+        );
+      }
+    }
   }
 }
