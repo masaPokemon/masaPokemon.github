@@ -7,7 +7,7 @@ class QuizScreen extends StatefulWidget {
 }
 
 class _QuizScreenState extends State<QuizScreen> {
-  final DatabaseReference _db = FirebaseDatabase.instance.reference().child('questions');
+  final DatabaseReference _db = FirebaseDatabase.instance.ref().child('questions');
   late List<Question> _questions;
   int _currentIndex = 0;
   int _score = 0;
