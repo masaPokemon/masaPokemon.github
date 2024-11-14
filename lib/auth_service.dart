@@ -1,44 +1,25 @@
 import 'package:firebase_auth/firebase_auth.dart';
+import 'package:google_sign_in/google_sign_in.dart';
 
 class AuthService {
   final FirebaseAuth _auth = FirebaseAuth.instance;
 
-  // サインイン（EmailとPassword）
-  Future<User?> signInWithEmailPassword(String email, String password) async {
-    try {
-      UserCredential userCredential = await _auth.signInWithEmailAndPassword(
-        email: email,
-        password: password,
-      );
-      return userCredential.user;
-    } catch (e) {
-      print("Sign-in error: $e");
-      return null;
+  Future<User?> signInWithGoogle() async {
+    final GoogleSignIn googleSignIn = GoogleSignIn();
+    final GoogleSignInAccount? googleUser = await googleSignIn.signIn();
+    if (googleUser == null) {
+      return null; // ユーザーがサインインしなかった場合
     }
+    final GoogleSignInAuthentication googleAuth = await googleUser.authentication;
+    final OAuthCredential credential = GoogleAuthProvider.credential(
+      accessToken: googleAuth.accessToken,
+      idToken: googleAuth.idToken,
+    );
+    final UserCredential userCredential = await _auth.signInWithCredential(credential);
+    return userCredential.user;
   }
 
-  // 新規ユーザー作成（EmailとPassword）
-  Future<User?> createUserWithEmailPassword(String email, String password) async {
-    try {
-      UserCredential userCredential = await _auth.createUserWithEmailAndPassword(
-        email: email,
-        password: password,
-      );
-      return userCredential.user;
-    } catch (e) {
-      print("Sign-up error: $e");
-      return null;
-    }
-  }
-
-  // サインアウト
   Future<void> signOut() async {
     await _auth.signOut();
   }
-
-  // 現在サインイン中のユーザー情報を取得
-  User? get currentUser => _auth.currentUser;
-
-  // サインイン状態の変化を監視
-  Stream<User?> get authStateChanges => _auth.authStateChanges();
 }
