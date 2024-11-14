@@ -19,7 +19,7 @@ class _QuizScreenState extends State<QuizScreen> {
   }
 
   Future<void> _loadQuestions() async {
-    DataSnapshot snapshot = _db.once();
+    DataSnapshot snapshot = await _db.once(DatabaseEventType.value);
     var data = snapshot.value;
     setState(() {
       _questions = List<Question>.from(data.map((item) => Question.fromMap(item)));
