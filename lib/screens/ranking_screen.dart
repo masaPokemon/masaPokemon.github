@@ -7,7 +7,7 @@ class RankingScreen extends StatefulWidget {
 }
 
 class _RankingScreenState extends State<RankingScreen> {
-  final DatabaseReference _db = FirebaseDatabase.instance.reference().child('scores');
+  final DatabaseReference _db = FirebaseDatabase.instance.ref().child('scores');
   late Stream<List<Player>> _rankingStream;
 
   @override
