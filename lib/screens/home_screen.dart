@@ -1,5 +1,5 @@
 import 'package:flutter/material.dart';
-import 'auth_service.dart';
+import 'package:quiz_app/auth_service.dart';
 import 'package:quiz_app/screens/quiz_screen.dart';
 import 'package:quiz_app/screens/ranking_screen.dart';
 
