@@ -28,7 +28,9 @@ class _HomeScreenState extends State<HomeScreen> {
 
   // ユーザーがログインしているかチェック
   void _checkUser() {
-    _authService._auth.onAuthStateChanged.listen((user) {
+    FirebaseAuth.instance
+  .authStateChanges()
+  .listen((User? user) {
       setState(() {
         _user = user;
       });
