@@ -5,7 +5,7 @@ import 'package:othello_game/screens/home_screen.dart';
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
-  await Firebase.initializeApp(); // Firebase初期化
+  await Firebase.initializeApp(options: DefaultFirebaseOptions.currentPlatform); // Firebase初期化
   runApp(MyApp());
 }
 
