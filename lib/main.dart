@@ -5,7 +5,7 @@ import 'package:flutter/material.dart';
 void main() async {
   requestNotificationPermission();
   WidgetsFlutterBinding.ensureInitialized();
-  await Firebase.initializeApp();  // Firebaseを初期化
+  await Firebase.initializeApp(options: DefaultFirebaseOptions.currentPlatform);  // Firebaseを初期化
   runApp(MyApp());
 }
 
