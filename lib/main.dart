@@ -1,28 +1,83 @@
+import 'package:firebase_core/firebase_core.dart';
+import 'package:firebase_messaging/firebase_messaging.dart';
 import 'package:flutter/material.dart';
-import 'package:model_viewer_plus/model_viewer_plus.dart';
 
-void main() => runApp(const MyApp());
+void main() async {
+  requestNotificationPermission();
+  WidgetsFlutterBinding.ensureInitialized();
+  await Firebase.initializeApp();  // Firebaseを初期化
+  runApp(MyApp());
+}
 
 class MyApp extends StatelessWidget {
-  const MyApp({super.key});
-
   @override
   Widget build(BuildContext context) {
     return MaterialApp(
-      debugShowCheckedModeBanner: false,
-      home: Scaffold(
-        appBar: AppBar(title: const Text('Model Viewer')),
-        body: const ModelViewer(
-          backgroundColor: Color.fromARGB(0xFF, 0xEE, 0xEE, 0xEE),
-          src: 'assets/Astronaut.glb',
-          alt: 'A 3D model of an astronaut',
-          ar: true,
-          arModes: ['scene-viewer', 'webxr', 'quick-look'],
-          autoRotate: true,
-          iosSrc: 'https://modelviewer.dev/shared-assets/models/Astronaut.usdz',
-          disableZoom: true,
-        ),
-      ),
+      home: HomeScreen(),
     );
   }
+}
+
+class HomeScreen extends StatefulWidget {
+  @override
+  _HomeScreenState createState() => _HomeScreenState();
+}
+
+class _HomeScreenState extends State<HomeScreen> {
+  FirebaseMessaging messaging = FirebaseMessaging.instance;
+
+  @override
+  void initState() {
+    super.initState();
+
+    // 通知の設定
+    FirebaseMessaging.onMessage.listen((RemoteMessage message) {
+      if (message.notification != null) {
+        // 通知の内容を表示
+        print('Received message: ${message.notification!.title}');
+        print('Message body: ${message.notification!.body}');
+        _showNotificationDialog(message.notification!.title, message.notification!.body);
+      }
+    });
+
+    // FCMトークンを取得
+    messaging.getToken().then((String? token) {
+      print("FCM Token: $token");
+    });
+  }
+
+  // 通知ダイアログを表示
+  void _showNotificationDialog(String? title, String? body) {
+    showDialog(
+      context: context,
+      builder: (context) {
+        return AlertDialog(
+          title: Text(title ?? 'No Title'),
+          content: Text(body ?? 'No Content'),
+          actions: <Widget>[
+            TextButton(
+              onPressed: () {
+                Navigator.of(context).pop();
+              },
+              child: Text('OK'),
+            ),
+          ],
+        );
+      },
+    );
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Scaffold(
+      appBar: AppBar(title: Text('Flutter Web FCM')),
+      body: Center(child: Text('Firebase Cloud Messaging for Web')),
+    );
+  }
+}
+
+void requestNotificationPermission() async {
+  // Web通知の許可をリクエスト
+  NotificationSettings settings = await FirebaseMessaging.instance.requestPermission();
+  print('Notification permission: ${settings.authorizationStatus}');
 }
