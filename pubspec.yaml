@@ -6,11 +6,10 @@ environment:
   sdk: '>=2.19.2 <3.0.0'
 
 dependencies:
+  firebase_messaging: ^15.0.1
+  flutter_local_notifications: ^17.1.2
   flutter:
     sdk: flutter
-  model_viewer_plus: ^1.9.1
-  firebase_core: ^3.8.0
-  firebase_messaging: ^15.1.6
 
 flutter_test:
     sdk: flutter
