@@ -1,13 +1,10 @@
 import 'dart:async';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
-import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 /// Firebase関係のインポート
 import 'package:firebase_core/firebase_core.dart';
 import 'firebase_options.dart';
-import 'package:firebase_analytics/firebase_analytics.dart';
-import 'package:firebase_crashlytics/firebase_crashlytics.dart';
 import 'package:firebase_messaging/firebase_messaging.dart';
 
 /// プラットフォームの確認
@@ -33,44 +30,13 @@ void main() async {
     /// FCMのバックグランドメッセージを表示
     FirebaseMessaging.onBackgroundMessage(_firebaseMessagingBackgroundHandler);
 
-    /// クラッシュハンドラ(Flutterフレームワーク内でスローされたすべてのエラー)
-    FlutterError.onError = FirebaseCrashlytics.instance.recordFlutterFatalError;
-
     /// runApp w/ Riverpod
-    runApp(const ProviderScope(child: MyApp()));
+    runApp(const MyApp());
   },
-
-      /// クラッシュハンドラ(Flutterフレームワーク内でキャッチされないエラー)
-      (error, stack) =>
-          FirebaseCrashlytics.instance.recordError(error, stack, fatal: true));
 }
 
 /// MaterialAppの設定
 class MyApp extends StatelessWidget {
-  const MyApp({Key? key}) : super(key: key);
-
-  @override
-  Widget build(BuildContext context) {
-    return MaterialApp(
-      title: 'Counter Firebase',
-      theme: ThemeData(
-        primarySwatch: Colors.blue,
-      ),
-      home: const MyHomePage(),
-      debugShowCheckedModeBanner: false,
-    );
-  }
-}
-
-/// ホームページ画面
-class MyHomePage extends ConsumerStatefulWidget {
-  const MyHomePage({Key? key}) : super(key: key);
-
-  @override
-  MyHomePageState createState() => MyHomePageState();
-}
-
-class MyHomePageState extends ConsumerState<MyHomePage> {
   @override
   void initState() {
     super.initState();
@@ -81,23 +47,34 @@ class MyHomePageState extends ConsumerState<MyHomePage> {
     /// FCMのトークン表示(テスト用)
     FirebaseMessagingService().fcmGetToken();
   }
-
   @override
   Widget build(BuildContext context) {
-    /// ユーザー情報の取得
-    Text("通知用")
-  }
-}
-
-/// Analyticsの実装
-class AnalyticsService {
-  /// ページ遷移のログ
-  Future<void> logPage(String screenName) async {
-    await FirebaseAnalytics.instance.logEvent(
-      name: 'screen_view',
-      parameters: {
-        'firebase_screen': screenName,
-      },
+    return MaterialApp(
+      title: 'Flutter Demo',
+      theme: ThemeData(primarySwatch: Colors.blue),
+      home: Scaffold(
+        body: Column(
+          mainAxisAlignment: MainAxisAlignment.spaceAround,
+          children: <Widget>[
+            // デフォルト表示
+            Text('Default'),
+            // 太さを指定
+            Text('Bold', style: TextStyle(fontWeight: FontWeight.bold)),
+            // スタイルを指定
+            Text('Italic', style: TextStyle(fontStyle: FontStyle.italic)),
+            // サイズを指定
+            Text('fontSize = 36', style: TextStyle(fontSize: 36)),
+            // 色を指定
+            Text('Red', style: TextStyle(color: Colors.red)),
+            Container(
+              width: double.infinity,
+              color: Colors.grey,
+              // 表示位置を指定
+              child: Text('TextAlign.right', textAlign: TextAlign.right),
+            ),
+          ],
+        ),
+      ),
     );
   }
 }
