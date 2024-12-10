@@ -19,20 +19,17 @@ Future<void> _firebaseMessagingBackgroundHandler(RemoteMessage message) async {
 }
 
 void main() async {
-  /// クラッシュハンドラ
-  runZonedGuarded<Future<void>>(() async {
-    /// Firebaseの初期化
-    WidgetsFlutterBinding.ensureInitialized();
-    await Firebase.initializeApp(
-      options: DefaultFirebaseOptions.currentPlatform,
-    );
+  /// Firebaseの初期化
+  WidgetsFlutterBinding.ensureInitialized();
+  await Firebase.initializeApp(
+    options: DefaultFirebaseOptions.currentPlatform,
+  );
 
-    /// FCMのバックグランドメッセージを表示
-    FirebaseMessaging.onBackgroundMessage(_firebaseMessagingBackgroundHandler);
+  /// FCMのバックグランドメッセージを表示
+  FirebaseMessaging.onBackgroundMessage(_firebaseMessagingBackgroundHandler);
 
-    /// runApp w/ Riverpod
-    runApp(const MyApp());
-  },
+  /// runApp w/ Riverpod
+  runApp(const MyApp());
 }
 
 /// MaterialAppの設定
