@@ -2,7 +2,8 @@ import 'firebase_options.dart';
 import 'package:firebase_core/firebase_core.dart';
 import 'package:firebase_database/firebase_database.dart';
 import 'package:flutter/material.dart';
-import 'package:flutter/services.dart';
+import 'dart:async';
+import 'dart:math';
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
@@ -14,7 +15,7 @@ class MyApp extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return MaterialApp(
-      title: 'タイピングゲーム',
+      title: 'リアルタイムタイピングゲーム',
       theme: ThemeData(
         primarySwatch: Colors.blue,
       ),
@@ -31,26 +32,70 @@ class TypingGame extends StatefulWidget {
 class _TypingGameState extends State<TypingGame> {
   final TextEditingController _controller = TextEditingController();
   late DatabaseReference _gameRef;
+  late String gameId;
+  late String playerId;
   String targetWord = '';
-  String currentWord = '';
   int score = 0;
+  int timeRemaining = 30;
+  String gameStatus = 'waiting'; // waiting, started, finished
 
   @override
   void initState() {
     super.initState();
-    _gameRef = FirebaseDatabase.instance.ref().child('game');
+    gameId = "pokemon";  // 実際にはサーバーから取得する
+    var random = math.Random();
+    playerId = random.nextInt(10000000000000);    // 実際には認証情報を基に決定する
+
+    _gameRef = FirebaseDatabase.instance.ref().child('games').child(gameId);
     
-    // Realtime Databaseから単語を受け取る
-    _gameRef.child('currentWord').onValue.listen((event) {
-      final word = event.snapshot.value;
-      setState(() {
-        currentWord = word ?? '';
-        targetWord = currentWord;
-      });
+    // ゲーム開始前の待機状態
+    _gameRef.child('gameStatus').onValue.listen((event) {
+      final status = event.snapshot.value;
+      if (status != null && status != gameStatus) {
+        setState(() {
+          gameStatus = status;
+        });
+        if (status == 'started') {
+          _startTimer();
+        }
+      }
+    });
+
+    // プレイヤーのスコアとターゲットワードの更新をリスン
+    _gameRef.child('players').child(playerId).onValue.listen((event) {
+      final playerData = event.snapshot.value;
+      if (playerData != null) {
+        setState(() {
+          targetWord = playerData['currentWord'] ?? '';
+          score = playerData['score'] ?? 0;
+        });
+      }
     });
     
-    // 新しい単語をセットする
-    _gameRef.child('score').set(0); // スコアを初期化
+    // タイムカウントダウン
+    _gameRef.child('timeRemaining').onValue.listen((event) {
+      final time = event.snapshot.value;
+      if (time != null) {
+        setState(() {
+          timeRemaining = time;
+        });
+      }
+    });
+  }
+
+  void _startTimer() {
+    Timer.periodic(Duration(seconds: 1), (timer) {
+      if (timeRemaining <= 0) {
+        timer.cancel();
+        _endGame();
+      } else {
+        _gameRef.child('timeRemaining').set(timeRemaining - 1);
+      }
+    });
+  }
+
+  void _endGame() {
+    _gameRef.child('gameStatus').set('finished');
   }
 
   void _onSubmit() {
@@ -60,22 +105,20 @@ class _TypingGameState extends State<TypingGame> {
         _controller.clear();
       });
 
-      // スコア更新
-      _gameRef.child('score').set(score);
+      // スコアを更新
+      _gameRef.child('players').child(playerId).child('score').set(score);
 
-      // 次の単語を生成
+      // 次の単語を生成してセット
       _generateNewWord();
     } else {
-      // ミスした場合
       _controller.clear();
     }
   }
 
-  // 新しい単語を生成してデータベースに反映させる
   void _generateNewWord() {
     final words = ["apple", "banana", "cherry", "date", "elderberry"];
     final randomWord = words[(words.length * (DateTime.now().millisecondsSinceEpoch % 1000) / 1000).floor()];
-    _gameRef.child('currentWord').set(randomWord);
+    _gameRef.child('players').child(playerId).child('currentWord').set(randomWord);
   }
 
   @override
@@ -86,13 +129,13 @@ class _TypingGameState extends State<TypingGame> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      appBar: AppBar(title: Text('タイピングゲーム')),
+      appBar: AppBar(title: Text('リアルタイムタイピングゲーム')),
       body: Padding(
         padding: const EdgeInsets.all(16.0),
         child: Column(
           mainAxisAlignment: MainAxisAlignment.center,
           children: <Widget>[
-            Text('タイピング: $targetWord', style: TextStyle(fontSize: 24)),
+            Text('ターゲットワード: $targetWord', style: TextStyle(fontSize: 24)),
             SizedBox(height: 20),
             TextField(
               controller: _controller,
@@ -104,10 +147,17 @@ class _TypingGameState extends State<TypingGame> {
             ),
             SizedBox(height: 20),
             Text('スコア: $score', style: TextStyle(fontSize: 20)),
-            ElevatedButton(
-              onPressed: () => _onSubmit(),
-              child: Text('送信'),
-            ),
+            SizedBox(height: 20),
+            Text('残り時間: $timeRemaining', style: TextStyle(fontSize: 20)),
+            if (gameStatus == 'waiting')
+              Text('ゲームが開始されるのを待っています...', style: TextStyle(fontSize: 18)),
+            if (gameStatus == 'finished')
+              Text('ゲーム終了！', style: TextStyle(fontSize: 18)),
+            if (gameStatus == 'started')
+              ElevatedButton(
+                onPressed: () => _onSubmit(),
+                child: Text('送信'),
+              ),
           ],
         ),
       ),
