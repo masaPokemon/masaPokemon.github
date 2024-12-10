@@ -1,6 +1,8 @@
-import 'dart:async';
+/// Flutter関係のインポート
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'dart:async';
 
 /// Firebase関係のインポート
 import 'package:firebase_core/firebase_core.dart';
@@ -18,22 +20,59 @@ Future<void> _firebaseMessagingBackgroundHandler(RemoteMessage message) async {
   print('Handling a background message: ${message.messageId}');
 }
 
+/// メイン
 void main() async {
-  /// Firebaseの初期化
-  WidgetsFlutterBinding.ensureInitialized();
-  await Firebase.initializeApp(
-    options: DefaultFirebaseOptions.currentPlatform,
-  );
+  /// クラッシュハンドラ
+  runZonedGuarded<Future<void>>(() async {
+    /// Firebaseの初期化
+    WidgetsFlutterBinding.ensureInitialized();
 
-  /// FCMのバックグランドメッセージを表示
-  FirebaseMessaging.onBackgroundMessage(_firebaseMessagingBackgroundHandler);
+    /// FCMのバックグランドメッセージを表示
+    FirebaseMessaging.onBackgroundMessage(_firebaseMessagingBackgroundHandler);
 
-  /// runApp w/ Riverpod
-  runApp(const MyApp());
+    await Firebase.initializeApp(
+      name: isAndroid || isIOS ? 'counterFirebase' : null,
+      options: DefaultFirebaseOptions.currentPlatform,
+    );
+
+    /// クラッシュハンドラ(Flutterフレームワーク内でスローされたすべてのエラー)
+    FlutterError.onError = FirebaseCrashlytics.instance.recordFlutterFatalError;
+
+    /// runApp w/ Riverpod
+    runApp(const ProviderScope(child: MyApp()));
+  },
+
+      /// クラッシュハンドラ(Flutterフレームワーク内でキャッチされないエラー)
+      (error, stack) =>
+          FirebaseCrashlytics.instance.recordError(error, stack, fatal: true));
 }
 
 /// MaterialAppの設定
 class MyApp extends StatelessWidget {
+  const MyApp({Key? key}) : super(key: key);
+
+  @override
+  Widget build(BuildContext context) {
+    return MaterialApp(
+      title: 'Counter Firebase',
+      theme: ThemeData(
+        primarySwatch: Colors.blue,
+      ),
+      home: const MyHomePage(),
+      debugShowCheckedModeBanner: false,
+    );
+  }
+}
+
+/// ホーム画面
+class MyHomePage extends ConsumerStatefulWidget {
+  const MyHomePage({Key? key}) : super(key: key);
+
+  @override
+  MyHomePageState createState() => MyHomePageState();
+}
+
+class MyHomePageState extends ConsumerState<MyHomePage> {
   @override
   void initState() {
     super.initState();
@@ -44,6 +83,7 @@ class MyApp extends StatelessWidget {
     /// FCMのトークン表示(テスト用)
     FirebaseMessagingService().fcmGetToken();
   }
+
   @override
   Widget build(BuildContext context) {
     return MaterialApp(
@@ -109,3 +149,4 @@ class FirebaseMessagingService {
     }
   }
 }
+    
