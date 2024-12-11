@@ -173,13 +173,13 @@ class Tile extends SpriteComponent {
     // タイルタイプに応じた画像を設定
     switch (type) {
       case TileType.grass:
-        sprite = await loadSprite('grass.png');
+        sprite = await gameRef.loadSprite('grass.png');
         break;
       case TileType.tree:
-        sprite = await loadSprite('tree.png');
+        sprite = await gameRef.loadSprite('tree.png');
         break;
       case TileType.water:
-        sprite = await loadSprite('water.png');
+        sprite = await gameRef.loadSprite('water.png');
         break;
     }
   }
