@@ -1,167 +1,186 @@
-import 'firebase_options.dart';
-import 'package:firebase_core/firebase_core.dart';
-import 'package:firebase_database/firebase_database.dart';
 import 'package:flutter/material.dart';
-import 'dart:async';
-import 'dart:math' as math;
-import 'dart:core';
+import 'package:flame/game.dart';
+import 'package:flame/components.dart';
+import 'package:flame/input.dart';
+import 'dart:math';
 
-void main() async {
-  WidgetsFlutterBinding.ensureInitialized();
-  await Firebase.initializeApp(options: DefaultFirebaseOptions.currentPlatform);
-  runApp(MyApp());
+// ゲームクラス
+void main() {
+  runApp(GameWidget(game: RPGGame()));
 }
 
-class MyApp extends StatelessWidget {
-  @override
-  Widget build(BuildContext context) {
-    return MaterialApp(
-      title: 'リアルタイムタイピングゲーム',
-      theme: ThemeData(
-        primarySwatch: Colors.blue,
-      ),
-      home: TypingGame(),
-    );
-  }
-}
+class RPGGame extends FlameGame with TapDetector {
+  late Player player;
+  late List<Enemy> enemies;
+  late List<Tile> tiles; // マップタイルのリスト
+  late Battle battle;
 
-class TypingGame extends StatefulWidget {
-  @override
-  _TypingGameState createState() => _TypingGameState();
-}
-
-class _TypingGameState extends State<TypingGame> {
-  final TextEditingController _controller = TextEditingController();
-  late DatabaseReference _gameRef;
-  late String gameId;
-  late String playerId;
-  String targetWord = '';
-  int score = 0;
-  int timeRemaining = 30;
-  String gameStatus = 'waiting'; // waiting, started, finished
+  final int mapWidth = 10;
+  final int mapHeight = 10;
+  final Random random = Random();
 
   @override
-  void initState() {
-    super.initState();
-    gameId = "pokemon";  // 実際にはサーバーから取得する
-    var random = math.Random();
-    playerId = random.nextInt(10000000000000);    // 実際には認証情報を基に決定する
+  Future<void> onLoad() async {
+    super.onLoad();
 
-    _gameRef = FirebaseDatabase.instance.ref().child('games').child(gameId);
-    
-    // ゲーム開始前の待機状態
-    _gameRef.child('gameStatus').onValue.listen((event) {
-      final status = event.snapshot.value;
-      if (status != null && status != gameStatus) {
-        setState(() {
-          gameStatus = status;
-        });
-        if (status == 'started') {
-          _startTimer();
-        }
-      }
-    });
+    // プレイヤーの初期化
+    player = Player();
+    add(player);
 
-    // プレイヤーのスコアとターゲットワードの更新をリスン
-    _gameRef.child('players').child(playerId).onValue.listen((event) {
-      final playerData = event.snapshot.value;
-      if (playerData != null) {
-        setState(() {
-          targetWord = playerData['currentWord'] ?? '';
-          score = playerData['score'] ?? 0;
-        });
-      }
-    });
-    
-    // タイムカウントダウン
-    _gameRef.child('timeRemaining').onValue.listen((event) {
-      final time = event.snapshot.value;
-      if (time != null) {
-        setState(() {
-          timeRemaining = time;
-        });
-      }
-    });
+    // 敵の初期化
+    enemies = [
+      Enemy(Vector2(200, 100)),
+      Enemy(Vector2(300, 300)),
+    ];
+    enemies.forEach((enemy) => add(enemy));
+
+    // マップの初期化
+    tiles = generateMap(mapWidth, mapHeight);
+    tiles.forEach((tile) => add(tile));
+
+    // バトルの初期化
+    battle = Battle(player, enemies[0]);
   }
 
-  void _startTimer() {
-    Timer.periodic(Duration(seconds: 1), (timer) {
-      if (timeRemaining <= 0) {
-        timer.cancel();
-        _endGame();
-      } else {
-        _gameRef.child('timeRemaining').set(timeRemaining - 1);
+  @override
+  void update(double dt) {
+    super.update(dt);
+    player.update(dt);
+
+    // プレイヤーと敵が接触した場合にバトル開始
+    for (var enemy in enemies) {
+      if (player.toRect().overlaps(enemy.toRect())) {
+        startBattle(player, enemy);
       }
-    });
-  }
-
-  void _endGame() {
-    _gameRef.child('gameStatus').set('finished');
-  }
-
-  void _onSubmit() {
-    if (_controller.text == targetWord) {
-      setState(() {
-        score++;
-        _controller.clear();
-      });
-
-      // スコアを更新
-      _gameRef.child('players').child(playerId).child('score').set(score);
-
-      // 次の単語を生成してセット
-      _generateNewWord();
-    } else {
-      _controller.clear();
     }
   }
 
-  void _generateNewWord() {
-    final words = ["apple", "banana", "cherry", "date", "elderberry"];
-    final randomWord = words[(words.length * (DateTime.now().millisecondsSinceEpoch % 1000) / 1000).floor()];
-    _gameRef.child('players').child(playerId).child('currentWord').set(randomWord);
+  // バトル開始処理
+  void startBattle(Player player, Enemy enemy) {
+    battle.start(player, enemy);
   }
 
-  @override
-  void dispose() {
-    super.dispose();
+  // ランダムにマップを生成する関数
+  List<Tile> generateMap(int width, int height) {
+    List<Tile> map = [];
+    for (int y = 0; y < height; y++) {
+      for (int x = 0; x < width; x++) {
+        // タイルの種類をランダムに決定
+        TileType type = TileType.values[random.nextInt(TileType.values.length)];
+        map.add(Tile(type, Vector2(x * 50.0, y * 50.0)));
+      }
+    }
+    return map;
+  }
+}
+
+// プレイヤークラス（プレイヤーキャラクター）
+class Player extends SpriteComponent {
+  Player() : super(size: Vector2(50, 50), position: Vector2(50, 50));
+
+  void update(double dt) {
+    // プレイヤーの移動ロジック（ここでは簡単に右下に移動）
+    if (position.x < 400) position.x += 1;
+    if (position.y < 400) position.y += 1;
+  }
+}
+
+// 敵モンスタークラス（ガクモン）
+class Enemy extends SpriteComponent {
+  final String name = 'ガクモン';
+
+  Enemy(Vector2 position) : super(position: position, size: Vector2(50, 50));
+}
+
+// バトルクラス（戦闘のロジック）
+class Battle {
+  final Player player;
+  final Enemy enemy;
+  late Skill skill;
+
+  Battle(this.player, this.enemy);
+
+  // バトルの開始処理
+  void start(Player player, Enemy enemy) {
+    print('Battle started with ${enemy.name}');
+    skill = MathSkill();  // 使用する技を選択
+
+    // 問題を出題
+    print('技選択: ${skill.question}');
+    print('選択肢: ${skill.options.join(", ")}');
   }
 
+  // プレイヤーが選んだ答えを判定
+  bool useSkill(String answer) {
+    if (skill.use(answer)) {
+      print('技発動成功');
+      return true;
+    } else {
+      print('技失敗');
+      return false;
+    }
+  }
+}
+
+// 技クラス（技の基盤）
+class Skill {
+  final String name;
+  final String question;
+  final List<String> options;
+  final String correctAnswer;
+
+  Skill(this.name, this.question, this.options, this.correctAnswer);
+
+  bool use(String answer) {
+    return answer == correctAnswer;
+  }
+}
+
+// 数学の技（ピタゴラスの定理）
+class MathSkill extends Skill {
+  MathSkill()
+      : super(
+          'ピタゴラスの定理', // 技名
+          'a² + b² = c² のcは何か？', // 問題
+          ['a', 'b', 'c', 'd'], // 選択肢
+          'c', // 正解
+        );
+
   @override
-  Widget build(BuildContext context) {
-    return Scaffold(
-      appBar: AppBar(title: Text('リアルタイムタイピングゲーム')),
-      body: Padding(
-        padding: const EdgeInsets.all(16.0),
-        child: Column(
-          mainAxisAlignment: MainAxisAlignment.center,
-          children: <Widget>[
-            Text('ターゲットワード: $targetWord', style: TextStyle(fontSize: 24)),
-            SizedBox(height: 20),
-            TextField(
-              controller: _controller,
-              decoration: InputDecoration(
-                labelText: 'ここに入力',
-                border: OutlineInputBorder(),
-              ),
-              onSubmitted: (text) => _onSubmit(),
-            ),
-            SizedBox(height: 20),
-            Text('スコア: $score', style: TextStyle(fontSize: 20)),
-            SizedBox(height: 20),
-            Text('残り時間: $timeRemaining', style: TextStyle(fontSize: 20)),
-            if (gameStatus == 'waiting')
-              Text('ゲームが開始されるのを待っています...', style: TextStyle(fontSize: 18)),
-            if (gameStatus == 'finished')
-              Text('ゲーム終了！', style: TextStyle(fontSize: 18)),
-            if (gameStatus == 'started')
-              ElevatedButton(
-                onPressed: () => _onSubmit(),
-                child: Text('送信'),
-              ),
-          ],
-        ),
-      ),
-    );
+  bool use(String answer) {
+    if (super.use(answer)) {
+      print('技成功: ピタゴラスの定理');
+      return true;
+    } else {
+      print('技失敗');
+      return false;
+    }
+  }
+}
+
+// タイルタイプの列挙
+enum TileType { grass, tree, water }
+
+// タイルクラス（マップのタイル）
+class Tile extends SpriteComponent {
+  final TileType type;
+
+  Tile(this.type, Vector2 position) : super(position: position, size: Vector2(50, 50));
+
+  @override
+  Future<void> onLoad() async {
+    super.onLoad();
+    // タイルタイプに応じた画像を設定
+    switch (type) {
+      case TileType.grass:
+        sprite = await loadSprite('grass.png');
+        break;
+      case TileType.tree:
+        sprite = await loadSprite('tree.png');
+        break;
+      case TileType.water:
+        sprite = await loadSprite('water.png');
+        break;
+    }
   }
 }
