@@ -1,10 +1,8 @@
 import 'package:flutter/material.dart';
 import 'package:firebase_core/firebase_core.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
-import 'post_list_page.dart';
-import 'create_post_page.dart';
-import 'post_detail_page.dart';
 import 'firebase_options.dart';
+import 'src/call_page.dart';
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
@@ -20,7 +18,7 @@ class MyApp extends StatelessWidget {
       theme: ThemeData(
         primarySwatch: Colors.blue,
       ),
-      home: PostListPage(),
+      home: CallPage(),
     );
   }
 }
