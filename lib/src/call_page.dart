@@ -6,7 +6,6 @@ import 'package:agora_rtc_engine/rtc_local_view.dart' as RtcLocalView;
 import 'package:agora_rtc_engine/rtc_remote_view.dart' as RtcRemoteView;
 import 'package:flutter/material.dart';
 import 'package:permission_handler/permission_handler.dart';
-import 'package:masa_chat/pages/chat_page.dart';
 
 const appId = "bf70cd8ee96740ff941f3764c5f880a8";
 const appCertificate = 'c70b32b75301494ebc30e105738af82d';
